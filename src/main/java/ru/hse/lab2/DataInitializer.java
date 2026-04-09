@@ -32,7 +32,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         if (filmRepository.count() == 0) {  // ← Проверяем по фильмам (главная сущность)
 
-            // 🎬 Создаём фильмы
+            //  Создаём фильмы
             Film film1 = new Film("Интерстеллар", "Фантастика", 169);
             Film film2 = new Film("Начало", "Фантастика", 148);
             Film film3 = new Film("Зелёная миля", "Драма", 189);
