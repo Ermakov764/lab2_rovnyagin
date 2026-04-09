@@ -1,6 +1,8 @@
+ru/hse/lab2/entity/Film.class
 ru/hse/lab2/Lab2Application.class
-ru/hse/lab2/repository/UserRepository.class
+ru/hse/lab2/repository/FilmRepository.class
+ru/hse/lab2/repository/ViewerRepository.class
 ru/hse/lab2/DataInitializer.class
-ru/hse/lab2/repository/PhoneRepository.class
-ru/hse/lab2/entity/User.class
-ru/hse/lab2/entity/Phone.class
+ru/hse/lab2/entity/Viewer.class
+ru/hse/lab2/entity/Ticket.class
+ru/hse/lab2/repository/TicketRepository.class

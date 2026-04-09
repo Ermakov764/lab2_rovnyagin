@@ -1,6 +1,8 @@
 /home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/DataInitializer.java
 /home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/Lab2Application.java
-/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/entity/Phone.java
-/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/entity/User.java
-/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/repository/PhoneRepository.java
-/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/repository/UserRepository.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/entity/Film.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/entity/Ticket.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/entity/Viewer.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/repository/FilmRepository.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/repository/TicketRepository.java
+/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/src/main/java/ru/hse/lab2/repository/ViewerRepository.java
