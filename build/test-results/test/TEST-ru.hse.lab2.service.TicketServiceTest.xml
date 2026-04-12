@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ru.hse.lab2.service.TicketServiceTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-04-10T13:50:11.056Z" hostname="ermakov" time="0.22">
+  <properties/>
+  <testcase name="getMaxViewersPerDayByFilm_returnsDayWithMaximumViewers()" classname="ru.hse.lab2.service.TicketServiceTest" time="0.2"/>
+  <testcase name="create_throwsConflictWhenSeatAlreadyTaken()" classname="ru.hse.lab2.service.TicketServiceTest" time="0.015"/>
+  <testcase name="getMaxViewersPerDayByFilm_usesEarlierDateAsTieBreaker()" classname="ru.hse.lab2.service.TicketServiceTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

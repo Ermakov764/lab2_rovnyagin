@@ -6,9 +6,7 @@ import java.util.Optional;
 
 public interface FilmRepository extends JpaRepository<Film, Long> {
 
-    // Найти фильм по названию
     Optional<Film> findByTitle(String title);
-
-    // Найти все фильмы жанра
-    // List<Film> findByGenre(String genre);
+    boolean existsByTitle(String title);
+    boolean existsByTitleAndIdNot(String title, Long id);
 }

@@ -1,0 +1,462 @@
+{
+  "info": {
+    "_postman_id": "6af8fd5c-4bb6-4fc1-b844-2fe03ee4c5b1",
+    "name": "Cinema LAB2 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection for smoke and basic negative checks of LAB2 cinema API."
+  },
+  "item": [
+    {
+      "name": "UI Pages",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/"
+          }
+        },
+        {
+          "name": "GET /films/page",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/films/page"
+          }
+        },
+        {
+          "name": "GET /viewers/page",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/viewers/page"
+          }
+        },
+        {
+          "name": "GET /tickets/page",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/tickets/page"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Films API (/api)",
+      "item": [
+        {
+          "name": "GET /api/films",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/films"
+          }
+        },
+        {
+          "name": "POST /api/films",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Response id is number\", function () {",
+                  "    pm.expect(json.id).to.be.a(\"number\");",
+                  "});",
+                  "pm.environment.set(\"filmId\", String(json.id));",
+                  "if (json.title) {",
+                  "    pm.environment.set(\"filmTitle\", json.title);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{filmTitle}}\",\n  \"genre\": \"Sci-Fi\",\n  \"durationMinutes\": 148\n}"
+            },
+            "url": "{{baseUrl}}/api/films"
+          }
+        },
+        {
+          "name": "GET /api/films/:id",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/films/{{filmId}}"
+          }
+        },
+        {
+          "name": "PUT /api/films/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{filmTitle}} Updated\",\n  \"genre\": \"Sci-Fi\",\n  \"durationMinutes\": 150\n}"
+            },
+            "url": "{{baseUrl}}/api/films/{{filmId}}"
+          }
+        },
+        {
+          "name": "DELETE /api/films/:missingId -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/films/{{missingId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Viewers API (/api)",
+      "item": [
+        {
+          "name": "GET /api/viewers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/viewers"
+          }
+        },
+        {
+          "name": "POST /api/viewers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Response id is number\", function () {",
+                  "    pm.expect(json.id).to.be.a(\"number\");",
+                  "});",
+                  "pm.environment.set(\"viewerId\", String(json.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Viewer\",\n  \"email\": \"postman.viewer@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/viewers"
+          }
+        },
+        {
+          "name": "GET /api/viewers/:id",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/viewers/{{viewerId}}"
+          }
+        },
+        {
+          "name": "PUT /api/viewers/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Viewer Updated\",\n  \"email\": \"postman.viewer.updated@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/viewers/{{viewerId}}"
+          }
+        },
+        {
+          "name": "DELETE /api/viewers/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/viewers/{{viewerId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets API (/api)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var sessionDate = pm.environment.get(\"sessionDate\");",
+              "if (!sessionDate || String(sessionDate).trim() === \"\") {",
+              "    var tomorrow = new Date();",
+              "    tomorrow.setDate(tomorrow.getDate() + 1);",
+              "    var yyyy = tomorrow.getFullYear();",
+              "    var mm = String(tomorrow.getMonth() + 1).padStart(2, \"0\");",
+              "    var dd = String(tomorrow.getDate()).padStart(2, \"0\");",
+              "    pm.environment.set(\"sessionDate\", yyyy + \"-\" + mm + \"-\" + dd);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "GET /api/tickets",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tickets"
+          }
+        },
+        {
+          "name": "POST /api/tickets",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var requiredVars = [\"filmId\", \"viewerId\"];",
+                  "var missingVars = requiredVars.filter(function (name) {",
+                  "    var value = pm.environment.get(name);",
+                  "    return !value || String(value).trim() === \"\";",
+                  "});",
+                  "if (missingVars.length > 0) {",
+                  "    throw new Error(\"Missing env vars: \" + missingVars.join(\", \") + \". Run POST /api/films and POST /api/viewers first.\");",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "pm.test(\"Response id is number\", function () {",
+                  "    pm.expect(json.id).to.be.a(\"number\");",
+                  "});",
+                  "pm.environment.set(\"ticketId\", String(json.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"viewerId\": {{viewerId}},\n  \"filmId\": {{filmId}},\n  \"sessionDate\": \"{{sessionDate}}\",\n  \"sessionTime\": \"19:00:00\",\n  \"seatNumber\": \"C5\",\n  \"price\": 15.5\n}"
+            },
+            "url": "{{baseUrl}}/api/tickets"
+          }
+        },
+        {
+          "name": "GET /api/tickets/:id",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tickets/{{ticketId}}"
+          }
+        },
+        {
+          "name": "PUT /api/tickets/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"viewerId\": {{viewerId}},\n  \"filmId\": {{filmId}},\n  \"sessionDate\": \"{{sessionDate}}\",\n  \"sessionTime\": \"21:30:00\",\n  \"seatNumber\": \"D7\",\n  \"price\": 17.0\n}"
+            },
+            "url": "{{baseUrl}}/api/tickets/{{ticketId}}"
+          }
+        },
+        {
+          "name": "DELETE /api/tickets/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/tickets/{{ticketId}}"
+          }
+        },
+        {
+          "name": "GET /api/tickets/analytics/max-viewers?filmId=...",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tickets/analytics/max-viewers?filmId={{filmId}}"
+          }
+        },
+        {
+          "name": "GET /api/tickets/analytics/top-film-by-day?date=...",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tickets/analytics/top-film-by-day?date=2026-04-20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative Checks",
+      "item": [
+        {
+          "name": "GET /api/films/:missingId -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/films/{{missingId}}"
+          }
+        },
+        {
+          "name": "POST /api/tickets invalid payload (viewerId string) -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"viewerId\": \"not-a-long\",\n  \"filmId\": {{filmId}},\n  \"sessionDate\": \"{{sessionDate}}\",\n  \"sessionTime\": \"19:00:00\",\n  \"seatNumber\": \"A1\",\n  \"price\": 10.0\n}"
+            },
+            "url": "{{baseUrl}}/api/tickets"
+          }
+        }
+      ]
+    }
+  ]
+}

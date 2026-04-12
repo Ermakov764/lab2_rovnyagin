@@ -1,5 +1,0 @@
-LAB2 (SpringData JPA)
-Развернуть PostgreSQL (в docker compose (https://proghunter.ru/articles/running-postgresql-and-pgadmin-in-docker ) или локально)
-Переделать компоненты-репозитории на работу с таблицами БД (аналогично ветке feature/spring-boot-data-jpa из https://bitbucket.org/zil-courses/hl-module1/src/main/ )
-Наполнить БД данными для тестирования
-Закоммитить изменения в git и показать преподавателю
