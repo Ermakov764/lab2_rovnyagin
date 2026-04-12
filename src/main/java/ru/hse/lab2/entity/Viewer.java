@@ -13,7 +13,7 @@ public class Viewer {
     private Long id;
 
     @Column(nullable = false)
-    private String name;  // ← Исправлено: одно поле name
+    private String name;
 
     @Column(nullable = false, unique = true)
     private String email;
@@ -35,12 +35,12 @@ public class Viewer {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public String getName() { return name; }  // ← Было getFirstName
+    public String getName() { return name; }  //
     public void setName(String name) { this.name = name; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public List<Ticket> getTickets() { return tickets; }  // ← Было getPhones
+    public List<Ticket> getTickets() { return tickets; }
     public void setTickets(List<Ticket> tickets) { this.tickets = tickets; }
 }
