@@ -1,6 +1,6 @@
-# Лабораторная работа №3: Cinema (Docker + Spring Boot + JPA + Flyway + PostgreSQL)
+# Лабораторная работа №3–4: Cinema (Docker + Spring Boot + JPA + Flyway + k6)
 
-Лабораторная №3 на базе №2: **контейнер приложения** (`Dockerfile`), **инициализация БД через Flyway** (DDL в `V1`, DML/seed в `V2`), **полный стенд в Docker Compose** — сервисы `postgresdb`, `app`, `pgadmin`. REST + HTML без изменений контрактов; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
+**№3:** контейнер приложения (`Dockerfile`), Flyway (DDL/DML), полный стек в Docker Compose (`postgresdb`, `app`, `pgadmin`). **№4:** нагрузочное тестирование [Grafana k6](https://k6.io/) — смешанная нагрузка POST/GET, серия прогонов с ростом VU, график средней задержки vs нагрузка. REST + HTML; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
 
 ## Эндпоинты
 
@@ -61,6 +61,7 @@
 - Java 25
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
+- **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для `k6/plot_avg_vs_vus.py` (`pip install -r k6/requirements-plot.txt`)
 
 ## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
 
@@ -357,6 +358,7 @@ lab2_rovnyagin/
 │   ├── application-docker.properties # URL БД для контейнера (postgresdb)
 │   └── db/migration/               # Flyway: V1 DDL, V2 DML
 ├── docker-compose.yml # postgresdb + app + pgadmin
+├── k6/                 # Лаб. 4: k6 (cinema-mixed.js, run-sweep.sh, plot_avg_vs_vus.py)
 └── README.md                       # Этот файл
 ```
 
@@ -538,6 +540,78 @@ UPDATE tickets
 SET price = 600.0 
 WHERE film_id = 1 AND session_date = '2026-04-25';
 ```
+
+## Лабораторная работа №4: нагрузочное тестирование (k6)
+
+Цель: смоделировать нагрузку на API с **растущим числом виртуальных пользователей (VU)** и построить **график среднего времени отклика** (`http_req_duration.avg`, мс) **от целевых VU**.
+
+### Что тестируется
+
+| Направление | Метод | Эндпоинт | Назначение |
+|-------------|--------|----------|------------|
+| Создание «простой» сущности (без ссылок на другие сущности в теле запроса) | `POST` | `/api/films` | JSON: `title`, `genre`, `durationMinutes` |
+| Статистика (агрегация по билетам/фильму) | `GET` | `/api/tickets/analytics/max-viewers?filmId=…` | Аналитика; для сида обычно `filmId=1` |
+
+Доля **POST / GET** настраивается переменной **`POST_SHARE`** в `[0..1]` (по умолчанию **0.5**, т.е. 50/50).
+
+### Скрипты (коммитятся в репозиторий)
+
+| Файл | Описание |
+|------|----------|
+| `k6/cinema-mixed.js` | Профиль k6: **`executor: 'ramping-vus'`**, пакет **`k6/http`**, чередование POST и GET по `POST_SHARE` |
+| `k6/run-sweep.sh` | Серия прогонов с **удвоением** целевых VU: **10 → 20 → 40 → 80 → 160**; для каждого уровня — `k6 run --summary-export k6/reports/summary-vus-<N>.json` |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** |
+| `k6/requirements-plot.txt` | Зависимость `matplotlib` для графика |
+
+Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
+
+### Подготовка
+
+1. Запустите API (например `docker compose up -d` или `./gradlew bootRun`), убедитесь, что доступен **`http://localhost:8080`** и в БД есть фильм с id **`1`** (Flyway `V2`), либо задайте **`FILM_ID`**.
+
+2. Установите k6 **или** используйте Docker (см. ниже).
+
+3. Для графика: `pip install -r k6/requirements-plot.txt`
+
+### Один прогон (ручной пример)
+
+```bash
+export BASE_URL=http://localhost:8080
+export TARGET_VUS=20
+export POST_SHARE=0.5
+export FILM_ID=1
+k6 run k6/cinema-mixed.js
+```
+
+Экспорт метрик в JSON:
+
+```bash
+k6 run --summary-export k6/reports/summary-vus-20.json k6/cinema-mixed.js
+```
+
+### Серия прогонов и график (рекомендуется для отчёта)
+
+```bash
+./k6/run-sweep.sh
+python3 k6/plot_avg_vs_vus.py k6/reports
+```
+
+Переменные окружения для sweep: **`BASE_URL`**, **`FILM_ID`**, **`POST_SHARE`** (как в `cinema-mixed.js`).
+
+Если **k6 не установлен**, но есть Docker:
+
+```bash
+USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
+```
+
+На Linux при необходимости скрипт добавляет `host.docker.internal` через `host-gateway`. Если обращение к API не проходит, используйте IP хоста или опубликуйте порт приложения в сети Docker.
+
+### Критерии соответствия ТЗ (кратко)
+
+- Используются **`ramping-vus`** и **`k6/http`**.
+- Нагрузка: **POST** создание простой сущности + **GET** эндпоинт **статистики**; пропорция **настраиваемая** (`POST_SHARE`).
+- Несколько уровней нагрузки (**4–5 точек**, удвоение VU) и **график avg vs VU** через `plot_avg_vs_vus.py`.
+
 ## Локальные адреса и порты
 
 | Адрес | Сервис | Назначение |
@@ -564,4 +638,4 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 - **Port:** `5432`
 - **Maintenance DB:** `lab2_db`
 - **Username:** `postgres`
-- **Password:** `lab2_password`# lab3_rovnyagin
+- **Password:** `lab2_password`
