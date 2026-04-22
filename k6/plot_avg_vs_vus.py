@@ -14,10 +14,17 @@ from typing import List, Optional, Tuple
 
 
 def extract_avg_ms(summary: dict) -> Optional[float]:
+    """Среднее http_req_duration (мс) из summary-export. Формат JSON менялся между версиями k6."""
     metrics = summary.get("metrics") or {}
     trend = metrics.get("http_req_duration") or {}
-    values = trend.get("values") or {}
-    avg = values.get("avg")
+    # Старые k6: metrics.http_req_duration.values.avg
+    values = trend.get("values")
+    if isinstance(values, dict):
+        avg = values.get("avg")
+        if avg is not None:
+            return float(avg)
+    # k6 v1.x: avg сразу в metrics.http_req_duration
+    avg = trend.get("avg")
     return float(avg) if avg is not None else None
 
 
