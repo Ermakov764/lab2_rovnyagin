@@ -1,6 +1,6 @@
-# Лабораторная работа №2: Cinema (Spring Boot + JPA + Flyway)
+# Лабораторная работа №3: Cinema (Docker + Spring Boot + JPA + Flyway + PostgreSQL)
 
-Проект после merge Task 02-08: REST + HTML слой, default-путь через `JPA/Flyway/PostgreSQL`, и opt-in профиль совместимости `inmemory`.
+Лабораторная №3 на базе №2: **контейнер приложения** (`Dockerfile`), **инициализация БД через Flyway** (DDL в `V1`, DML/seed в `V2`), **полный стенд в Docker Compose** — сервисы `postgresdb`, `app`, `pgadmin`. REST + HTML без изменений контрактов; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
 
 ## Эндпоинты
 
@@ -62,38 +62,45 @@
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
 
-## Быстрый старт (default: JPA + Flyway + PostgreSQL)
+## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
 
-1) Поднять инфраструктуру:
-
-```bash
-docker compose up -d
-```
-
-2) Запустить приложение:
+1) Поднять **весь стек** (PostgreSQL + приложение + pgAdmin), при необходимости пересобрать образ приложения:
 
 ```bash
-./gradlew bootRun
+docker compose up -d --build
 ```
 
-3) Проверить, что приложение стартовало:
+2) Проверить приложение:
 
-- в логах есть `Started Lab2Application`
-- доступна HTML главная: `http://localhost:8080/`
+- в логах: `docker compose logs -f app` — должно быть `Started Lab2Application`;
+- в браузере: `http://localhost:8080/` (HTML), например `http://localhost:8080/api/films` (REST).
 
-4) Остановить:
+3) Остановить:
 
 ```bash
 docker compose down
 ```
 
+Полный сброс данных БД (миграции Flyway с нуля при следующем старте):
+
+```bash
+docker compose down -v
+```
+
+**Вариант для разработки на хосте:** временно отключите сервис `app` в `docker-compose.yml` (или смените ему публикацию порта), поднимите остальные сервисы и выполните `./gradlew bootRun` — см. **«Подробный runbook»**, п. 2.
+
 ## Профили запуска
 
 ### Default (без профиля)
 
-- Используется PostgreSQL (`spring.datasource.*` в `application.properties`)
+- Используется PostgreSQL (`spring.datasource.*` в `application.properties`, URL на `localhost` при запуске с хоста)
 - Включены Flyway миграции (`V1`, `V2`)
 - Hibernate работает в `ddl-auto=validate`
+
+### `docker` (запуск приложения в контейнере)
+
+- Включается переменной `SPRING_PROFILES_ACTIVE=docker` в сервисе `app` в `docker-compose.yml`
+- В `application-docker.properties` задан JDBC URL на хост БД в сети Compose: `jdbc:postgresql://postgresdb:5432/lab2_db` (логин/пароль те же, что в основном `application.properties`)
 
 ### `inmemory` (режим совместимости)
 
@@ -150,12 +157,12 @@ docker compose down
 - `POST /viewers/page/create`
 - `POST /tickets/page/create`
 
-## Миграции и БД
+## Миграции и БД (требование лаб. 3: DDL + DML)
 
-- SQL миграции: `src/main/resources/db/migration`
-  - `V1__create_schema.sql`
-  - `V2__seed_test_data.sql`
-- По умолчанию Flyway применяет миграции на старте приложения.
+- Каталог: `src/main/resources/db/migration`
+  - `V1__create_schema.sql` — **DDL** (создание таблиц `viewers`, `films`, `tickets`, ключи и ограничения)
+  - `V2__seed_test_data.sql` — **DML** (начальные `INSERT` и `setval` последовательностей после явных `id`)
+- Flyway применяет скрипты при старте приложения (в контейнере или при `./gradlew bootRun`).
 - Таблицы домена: `films`, `viewers`, `tickets`.
 
 ## Postman
@@ -194,26 +201,40 @@ docker compose down
 
 - Пошаговый runbook: `docs/RUNBOOK.md`
 - Verification checklist (Task 07): `docs/verification-checklist.md`
-# Лабораторная работа №2: Spring Data JPA + PostgreSQL (Кинотеатр)
+## Подробный runbook
 
-## Быстрый запуск
 **Требования:** Java 25, Docker Desktop (или Docker Engine + Compose), Gradle Wrapper (`./gradlew`).
 
-### 1. Запуск базы данных
-В терминале в корне проекта выполните:
+### 1. Полный стенд (лаб. 3): БД + приложение + pgAdmin в Compose
+
+В корне проекта:
+
+```bash
+docker compose up -d --build
+```
+
+Дождитесь **Healthy** у `postgresdb` и успешного старта контейнера приложения (`docker compose ps`, `docker compose logs app`).
+
+### 2. Запуск приложения на хосте при БД в Docker
+
+Поднимите контейнеры (если сервис `app` включён и занимает `8080`, отключите его в `docker-compose.yml` или смените порт для локального `bootRun`):
+
 ```bash
 docker compose up -d
 ```
-Дождитесь статуса Up для контейнеров postgresdb и pgadmin.
-### 2. Запуск приложения (Gradle)
-В терминале в корне проекта выполните:
+
+Затем:
+
 ```bash
 ./gradlew bootRun
 ```
-Если порт `8080` занят, запустите на альтернативном порту:
+
+Если порт `8080` занят:
+
 ```bash
 ./gradlew bootRun --args='--server.port=8081'
 ```
+
 Альтернатива в IntelliJ IDEA: запустите класс `Lab2Application.java` как Gradle/Spring Boot приложение.
 
 ### 2.1 Режим совместимости `inmemory` (opt-in)
@@ -231,11 +252,11 @@ docker compose up -d
 - поднимаются демо-данные для базовых сценариев (`films`, `viewers`, `tickets`).
 
 ### 3. Проверка запуска приложения
-В консоли должно появиться:
-Started Lab2Application in ... seconds
-После старта Flyway автоматически применит миграции `V1` и `V2`.
 
-Корневой URL (`http://localhost:8080/`) обслуживается `HtmlPageController` и возвращает HTML home page.
+В логах контейнера `app` или консоли `bootRun` должно быть: `Started Lab2Application in ... seconds`. После старта Flyway применит миграции `V1` и `V2`.
+
+Корневой URL (`http://localhost:8080/`, если порт не меняли) обслуживается `HtmlPageController` и возвращает HTML home page.
+
 ### 4. Postman: где файлы и smoke-check
 Postman-артефакты лежат в директории `postman/`:
 - `postman/cinema-lab2.postman_collection.json`
@@ -257,7 +278,7 @@ docker compose down
 ```
 ---
 ## Описание проекта
-Проект демонстрирует работу с реляционной базой данных PostgreSQL через Spring Data JPA в рамках предметной области «Кинотеатр».
+Проект демонстрирует работу с реляционной базой данных PostgreSQL через Spring Data JPA в предметной области «Кинотеатр» и **развёртывание приложения и БД в Docker Compose** (лабораторная №3).
 Реализована система бронирования билетов, включающая связь One-to-Many между сущностями:
 - Film (Фильм): один фильм может иметь много билетов.
 - Viewer (Зритель): один зритель может купить много билетов.
@@ -271,9 +292,11 @@ docker compose down
 - Репозитории Spring Data -> отдельные `FilmRepository`, `ViewerRepository`, `TicketRepository` (на базе `JpaRepository`).
 - Кастомный JPQL-запрос -> аналитический запрос в `TicketRepository` для поиска дня с максимальным числом зрителей по фильму.
 - Инициализация схемы и тестовых данных -> Flyway-миграции (`V1__create_schema.sql`, `V2__seed_test_data.sql`) применяются при старте.
-- PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose) и настройки в `application.properties` вместо in-memory БД.
+- PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose), в контейнере приложения — профиль `docker` и `application-docker.properties`.
+- Контейнеризация (лаб. 3) -> `Dockerfile` (multi-stage, Java 25), сервис `app` в `docker-compose.yml`.
 Ссылка на шаблон (ветка `feature/spring-boot-data-jpa`): https://bitbucket.org/zil-courses/hl-module1/src/feature/spring-boot-data-jpa/
 ###  Что реализовано:
+-  Контейнеризация Spring Boot (`Dockerfile`) и запуск приложения вместе с БД в `docker compose`
 -  Подключение PostgreSQL через Docker
 - Создание сущностей с аннотациями JPA
 - Репозитории для работы с БД
@@ -281,7 +304,7 @@ docker compose down
 - Наполнение БД тестовыми данными через Flyway-миграции
 - Визуальное управление через pgAdmin
   #### Техническая часть
- - Инфраструктура (Docker): Развертывание PostgreSQL и pgAdmin в изолированном окружении через docker-compose.
+ - Инфраструктура (Docker): PostgreSQL, pgAdmin и приложение в одном `docker-compose.yml`; образ приложения собирается из `Dockerfile`.
  -  ORM-маппинг (JPA): Hibernate работает в режиме валидации схемы (`ddl-auto=validate`), а создание структуры и сидирование выполняет Flyway.
  -  Типизация данных: Корректное маппинг Java-типов (LocalDate, LocalTime, Double) на типы данных PostgreSQL (DATE, TIME, DOUBLE PRECISION).
  -  Аналитика (JPQL): Реализация кастомного запроса в репозитории для группировки и поиска дня с максимальной посещаемостью конкретного фильма.
@@ -307,8 +330,9 @@ docker compose down
 | Spring Boot | 4.0.3 | Фреймворк |
 | Spring Data JPA | - | Работа с БД |
 | Hibernate | управляется Spring Boot 4.0.3 | ORM |
-| PostgreSQL | latest | База данных |
-| Docker Compose | - | Контейнеризация |
+| PostgreSQL | 15-alpine (образ в compose) | База данных |
+| Docker / Compose | - | Контейнеры БД, pgAdmin и приложения |
+| Dockerfile | multi-stage Temurin 25 | Сборка и запуск Spring Boot в контейнере |
 | Gradle | wrapper | Сборка и запуск проекта |
 
 ---
@@ -317,6 +341,7 @@ docker compose down
 
 ```text
 lab2_rovnyagin/
+├── Dockerfile                      # Образ приложения (лаб. 3)
 ├── src/main/java/ru/hse/lab2/
 │   ├── Lab2Application.java        # Точка входа
 │   ├── entity/
@@ -328,9 +353,10 @@ lab2_rovnyagin/
 │       ├── ViewerRepository.java   # CRUD для зрителей
 │       └── TicketRepository.java   # CRUD + аналитические запросы
 ├── src/main/resources/
-│   ├── application.properties      # Конфигурация
-│   └── db/migration/               # Flyway-миграции (V1, V2)
-├── docker-compose.yml              # Инфраструктура (Postgres + pgAdmin)
+│   ├── application.properties       # Конфигурация (хост: localhost)
+│   ├── application-docker.properties # URL БД для контейнера (postgresdb)
+│   └── db/migration/               # Flyway: V1 DDL, V2 DML
+├── docker-compose.yml # postgresdb + app + pgadmin
 └── README.md                       # Этот файл
 ```
 
@@ -516,7 +542,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 | Адрес | Сервис | Назначение |
 |-------|--------|------------|
-| `http://localhost:8080` | Spring Boot | Основное приложение (веб-сервер / REST API) |
+| `http://localhost:8080` | Spring Boot | Приложение (в т.ч. из контейнера `app` при полном `docker compose up`) |
 | `http://localhost:15432` | pgAdmin 4 | Веб-интерфейс для визуального управления БД |
 | `localhost:5432` | PostgreSQL | База данных (используется приложением для подключения) |
 
@@ -538,4 +564,4 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 - **Port:** `5432`
 - **Maintenance DB:** `lab2_db`
 - **Username:** `postgres`
-- **Password:** `lab2_password`
+- **Password:** `lab2_password`# lab3_rovnyagin
