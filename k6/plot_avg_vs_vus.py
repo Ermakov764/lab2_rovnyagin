@@ -2,6 +2,8 @@
 """
 LAB4: строит график среднего времени отклика (avg http_req_duration, мс) vs целевых VU
 по JSON-файлам, сохранённым k6 с флагом --summary-export.
+
+Зависимость (один раз): pip install "matplotlib>=3.7"
 """
 import argparse
 import json
@@ -64,11 +66,10 @@ def main() -> None:
     if len(points) < 2:
         print("Нужно минимум 2 файла summary-vus-*.json с валидными avg.", file=sys.stderr)
         sys.exit(1)
-
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("Установите matplotlib: pip install matplotlib", file=sys.stderr)
+        print('Установите matplotlib: pip install "matplotlib>=3.7"', file=sys.stderr)
         sys.exit(1)
 
     vus_list, avg_list = zip(*points)

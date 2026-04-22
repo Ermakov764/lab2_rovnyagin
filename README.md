@@ -61,7 +61,7 @@
 - Java 25
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
-- **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для `k6/plot_avg_vs_vus.py` (`pip install -r k6/requirements-plot.txt`)
+- **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
 
 ## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
 
@@ -560,8 +560,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 |------|----------|
 | `k6/cinema-mixed.js` | Профиль k6: **`executor: 'ramping-vus'`**, пакет **`k6/http`**, чередование POST и GET по `POST_SHARE` |
 | `k6/run-sweep.sh` | Серия прогонов с **удвоением** целевых VU: **10 → 20 → 40 → 80 → 160**; для каждого уровня — `k6 run --summary-export k6/reports/summary-vus-<N>.json` |
-| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** |
-| `k6/requirements-plot.txt` | Зависимость `matplotlib` для графика |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** (нужен `matplotlib`, см. ниже) |
 
 Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
 
@@ -571,7 +570,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 2. Установите k6 **или** используйте Docker (см. ниже).
 
-3. Для графика: `pip install -r k6/requirements-plot.txt`
+3. Для графика: `pip install "matplotlib>=3.7"`
 
 ### Один прогон (ручной пример)
 
