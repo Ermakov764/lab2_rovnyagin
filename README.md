@@ -559,8 +559,8 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 | Файл | Описание |
 |------|----------|
 | `k6/cinema-mixed.js` | Профиль k6: **`executor: 'ramping-vus'`**, пакет **`k6/http`**, чередование POST и GET по `POST_SHARE` |
-| `k6/run-sweep.sh` | Серия прогонов с **удвоением** целевых VU: **10 → 20 → 40 → 80 → 160**; для каждого уровня — `k6 run --summary-export k6/reports/summary-vus-<N>.json` |
-| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** (нужен `matplotlib`, см. ниже) |
+| `k6/run-sweep.sh` | Серия прогонов **10 → 20 → 40 → 80 → 160**; перед стартом **очищает** `k6/reports` (JSON/PNG); после прогонов при необходимости ставит **`matplotlib`** и строит **`avg_vs_vus.png`**. Опции: **`NO_CLEAN=1`**, **`NO_PLOT=1`**, **`USE_DOCKER_K6=1`**. |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** (зависимость: `matplotlib>=3.7`; при обычном `./k6/run-sweep.sh` ставится сама при отсутствии). |
 
 Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
 
@@ -570,7 +570,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 2. Установите k6 **или** используйте Docker (см. ниже).
 
-3. Для графика: `pip install "matplotlib>=3.7"`
+3. **matplotlib** для графика подтянет сам **`./k6/run-sweep.sh`** (`pip install --user` при первом запуске). Вручную при необходимости: `pip install "matplotlib>=3.7"`.
 
 ### Один прогон (ручной пример)
 
@@ -590,10 +590,13 @@ k6 run --summary-export k6/reports/summary-vus-20.json k6/cinema-mixed.js
 
 ### Серия прогонов и график (рекомендуется для отчёта)
 
+Одна команда: очистка старых отчётов в `k6/reports`, пять прогонов k6, затем график **`avg_vs_vus.png`** (и при необходимости установка matplotlib в user-site):
+
 ```bash
 ./k6/run-sweep.sh
-python3 k6/plot_avg_vs_vus.py k6/reports
 ```
+
+Не удалять прошлые JSON/PNG перед прогоном: **`NO_CLEAN=1 ./k6/run-sweep.sh`**. Только метрики без графика: **`NO_PLOT=1 ./k6/run-sweep.sh`**.
 
 Переменные окружения для sweep: **`BASE_URL`**, **`FILM_ID`**, **`POST_SHARE`** (как в `cinema-mixed.js`).
 
