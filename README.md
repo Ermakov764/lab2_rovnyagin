@@ -1,6 +1,6 @@
-# Лабораторная работа №2: Cinema (Spring Boot + JPA + Flyway)
+# Лабораторная работа №3–4: Cinema (Docker + Spring Boot + JPA + Flyway + k6)
 
-Проект после merge Task 02-08: REST + HTML слой, default-путь через `JPA/Flyway/PostgreSQL`, и opt-in профиль совместимости `inmemory`.
+**№3:** контейнер приложения (`Dockerfile`), Flyway (DDL/DML), полный стек в Docker Compose (`postgresdb`, `app`, `pgadmin`). **№4:** нагрузочное тестирование [Grafana k6](https://k6.io/) — смешанная нагрузка POST/GET, серия прогонов с ростом VU, график средней задержки vs нагрузка. REST + HTML; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
 
 ## Эндпоинты
 
@@ -61,39 +61,47 @@
 - Java 25
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
+- **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
 
-## Быстрый старт (default: JPA + Flyway + PostgreSQL)
+## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
 
-1) Поднять инфраструктуру:
-
-```bash
-docker compose up -d
-```
-
-2) Запустить приложение:
+1) Поднять **весь стек** (PostgreSQL + приложение + pgAdmin), при необходимости пересобрать образ приложения:
 
 ```bash
-./gradlew bootRun
+docker compose up -d --build
 ```
 
-3) Проверить, что приложение стартовало:
+2) Проверить приложение:
 
-- в логах есть `Started Lab2Application`
-- доступна HTML главная: `http://localhost:8080/`
+- в логах: `docker compose logs -f app` — должно быть `Started Lab2Application`;
+- в браузере: `http://localhost:8080/` (HTML), например `http://localhost:8080/api/films` (REST).
 
-4) Остановить:
+3) Остановить:
 
 ```bash
 docker compose down
 ```
 
+Полный сброс данных БД (миграции Flyway с нуля при следующем старте):
+
+```bash
+docker compose down -v
+```
+
+**Вариант для разработки на хосте:** временно отключите сервис `app` в `docker-compose.yml` (или смените ему публикацию порта), поднимите остальные сервисы и выполните `./gradlew bootRun` — см. **«Подробный runbook»**, п. 2.
+
 ## Профили запуска
 
 ### Default (без профиля)
 
-- Используется PostgreSQL (`spring.datasource.*` в `application.properties`)
+- Используется PostgreSQL (`spring.datasource.*` в `application.properties`, URL на `localhost` при запуске с хоста)
 - Включены Flyway миграции (`V1`, `V2`)
 - Hibernate работает в `ddl-auto=validate`
+
+### `docker` (запуск приложения в контейнере)
+
+- Включается переменной `SPRING_PROFILES_ACTIVE=docker` в сервисе `app` в `docker-compose.yml`
+- В `application-docker.properties` задан JDBC URL на хост БД в сети Compose: `jdbc:postgresql://postgresdb:5432/lab2_db` (логин/пароль те же, что в основном `application.properties`)
 
 ### `inmemory` (режим совместимости)
 
@@ -150,12 +158,12 @@ docker compose down
 - `POST /viewers/page/create`
 - `POST /tickets/page/create`
 
-## Миграции и БД
+## Миграции и БД (требование лаб. 3: DDL + DML)
 
-- SQL миграции: `src/main/resources/db/migration`
-  - `V1__create_schema.sql`
-  - `V2__seed_test_data.sql`
-- По умолчанию Flyway применяет миграции на старте приложения.
+- Каталог: `src/main/resources/db/migration`
+  - `V1__create_schema.sql` — **DDL** (создание таблиц `viewers`, `films`, `tickets`, ключи и ограничения)
+  - `V2__seed_test_data.sql` — **DML** (начальные `INSERT` и `setval` последовательностей после явных `id`)
+- Flyway применяет скрипты при старте приложения (в контейнере или при `./gradlew bootRun`).
 - Таблицы домена: `films`, `viewers`, `tickets`.
 
 ## Postman
@@ -194,26 +202,40 @@ docker compose down
 
 - Пошаговый runbook: `docs/RUNBOOK.md`
 - Verification checklist (Task 07): `docs/verification-checklist.md`
-# Лабораторная работа №2: Spring Data JPA + PostgreSQL (Кинотеатр)
+## Подробный runbook
 
-## Быстрый запуск
 **Требования:** Java 25, Docker Desktop (или Docker Engine + Compose), Gradle Wrapper (`./gradlew`).
 
-### 1. Запуск базы данных
-В терминале в корне проекта выполните:
+### 1. Полный стенд (лаб. 3): БД + приложение + pgAdmin в Compose
+
+В корне проекта:
+
+```bash
+docker compose up -d --build
+```
+
+Дождитесь **Healthy** у `postgresdb` и успешного старта контейнера приложения (`docker compose ps`, `docker compose logs app`).
+
+### 2. Запуск приложения на хосте при БД в Docker
+
+Поднимите контейнеры (если сервис `app` включён и занимает `8080`, отключите его в `docker-compose.yml` или смените порт для локального `bootRun`):
+
 ```bash
 docker compose up -d
 ```
-Дождитесь статуса Up для контейнеров postgresdb и pgadmin.
-### 2. Запуск приложения (Gradle)
-В терминале в корне проекта выполните:
+
+Затем:
+
 ```bash
 ./gradlew bootRun
 ```
-Если порт `8080` занят, запустите на альтернативном порту:
+
+Если порт `8080` занят:
+
 ```bash
 ./gradlew bootRun --args='--server.port=8081'
 ```
+
 Альтернатива в IntelliJ IDEA: запустите класс `Lab2Application.java` как Gradle/Spring Boot приложение.
 
 ### 2.1 Режим совместимости `inmemory` (opt-in)
@@ -231,11 +253,11 @@ docker compose up -d
 - поднимаются демо-данные для базовых сценариев (`films`, `viewers`, `tickets`).
 
 ### 3. Проверка запуска приложения
-В консоли должно появиться:
-Started Lab2Application in ... seconds
-После старта Flyway автоматически применит миграции `V1` и `V2`.
 
-Корневой URL (`http://localhost:8080/`) обслуживается `HtmlPageController` и возвращает HTML home page.
+В логах контейнера `app` или консоли `bootRun` должно быть: `Started Lab2Application in ... seconds`. После старта Flyway применит миграции `V1` и `V2`.
+
+Корневой URL (`http://localhost:8080/`, если порт не меняли) обслуживается `HtmlPageController` и возвращает HTML home page.
+
 ### 4. Postman: где файлы и smoke-check
 Postman-артефакты лежат в директории `postman/`:
 - `postman/cinema-lab2.postman_collection.json`
@@ -257,7 +279,7 @@ docker compose down
 ```
 ---
 ## Описание проекта
-Проект демонстрирует работу с реляционной базой данных PostgreSQL через Spring Data JPA в рамках предметной области «Кинотеатр».
+Проект демонстрирует работу с реляционной базой данных PostgreSQL через Spring Data JPA в предметной области «Кинотеатр» и **развёртывание приложения и БД в Docker Compose** (лабораторная №3).
 Реализована система бронирования билетов, включающая связь One-to-Many между сущностями:
 - Film (Фильм): один фильм может иметь много билетов.
 - Viewer (Зритель): один зритель может купить много билетов.
@@ -271,9 +293,11 @@ docker compose down
 - Репозитории Spring Data -> отдельные `FilmRepository`, `ViewerRepository`, `TicketRepository` (на базе `JpaRepository`).
 - Кастомный JPQL-запрос -> аналитический запрос в `TicketRepository` для поиска дня с максимальным числом зрителей по фильму.
 - Инициализация схемы и тестовых данных -> Flyway-миграции (`V1__create_schema.sql`, `V2__seed_test_data.sql`) применяются при старте.
-- PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose) и настройки в `application.properties` вместо in-memory БД.
+- PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose), в контейнере приложения — профиль `docker` и `application-docker.properties`.
+- Контейнеризация (лаб. 3) -> `Dockerfile` (multi-stage, Java 25), сервис `app` в `docker-compose.yml`.
 Ссылка на шаблон (ветка `feature/spring-boot-data-jpa`): https://bitbucket.org/zil-courses/hl-module1/src/feature/spring-boot-data-jpa/
 ###  Что реализовано:
+-  Контейнеризация Spring Boot (`Dockerfile`) и запуск приложения вместе с БД в `docker compose`
 -  Подключение PostgreSQL через Docker
 - Создание сущностей с аннотациями JPA
 - Репозитории для работы с БД
@@ -281,7 +305,7 @@ docker compose down
 - Наполнение БД тестовыми данными через Flyway-миграции
 - Визуальное управление через pgAdmin
   #### Техническая часть
- - Инфраструктура (Docker): Развертывание PostgreSQL и pgAdmin в изолированном окружении через docker-compose.
+ - Инфраструктура (Docker): PostgreSQL, pgAdmin и приложение в одном `docker-compose.yml`; образ приложения собирается из `Dockerfile`.
  -  ORM-маппинг (JPA): Hibernate работает в режиме валидации схемы (`ddl-auto=validate`), а создание структуры и сидирование выполняет Flyway.
  -  Типизация данных: Корректное маппинг Java-типов (LocalDate, LocalTime, Double) на типы данных PostgreSQL (DATE, TIME, DOUBLE PRECISION).
  -  Аналитика (JPQL): Реализация кастомного запроса в репозитории для группировки и поиска дня с максимальной посещаемостью конкретного фильма.
@@ -307,8 +331,9 @@ docker compose down
 | Spring Boot | 4.0.3 | Фреймворк |
 | Spring Data JPA | - | Работа с БД |
 | Hibernate | управляется Spring Boot 4.0.3 | ORM |
-| PostgreSQL | latest | База данных |
-| Docker Compose | - | Контейнеризация |
+| PostgreSQL | 15-alpine (образ в compose) | База данных |
+| Docker / Compose | - | Контейнеры БД, pgAdmin и приложения |
+| Dockerfile | multi-stage Temurin 25 | Сборка и запуск Spring Boot в контейнере |
 | Gradle | wrapper | Сборка и запуск проекта |
 
 ---
@@ -317,6 +342,7 @@ docker compose down
 
 ```text
 lab2_rovnyagin/
+├── Dockerfile                      # Образ приложения (лаб. 3)
 ├── src/main/java/ru/hse/lab2/
 │   ├── Lab2Application.java        # Точка входа
 │   ├── entity/
@@ -328,9 +354,11 @@ lab2_rovnyagin/
 │       ├── ViewerRepository.java   # CRUD для зрителей
 │       └── TicketRepository.java   # CRUD + аналитические запросы
 ├── src/main/resources/
-│   ├── application.properties      # Конфигурация
-│   └── db/migration/               # Flyway-миграции (V1, V2)
-├── docker-compose.yml              # Инфраструктура (Postgres + pgAdmin)
+│   ├── application.properties       # Конфигурация (хост: localhost)
+│   ├── application-docker.properties # URL БД для контейнера (postgresdb)
+│   └── db/migration/               # Flyway: V1 DDL, V2 DML
+├── docker-compose.yml # postgresdb + app + pgadmin
+├── k6/                 # Лаб. 4: k6 (cinema-mixed.js, run-sweep.sh, plot_avg_vs_vus.py)
 └── README.md                       # Этот файл
 ```
 
@@ -512,11 +540,85 @@ UPDATE tickets
 SET price = 600.0 
 WHERE film_id = 1 AND session_date = '2026-04-25';
 ```
+
+## Лабораторная работа №4: нагрузочное тестирование (k6)
+
+Цель: смоделировать нагрузку на API с **растущим числом виртуальных пользователей (VU)** и построить **график среднего времени отклика** (`http_req_duration.avg`, мс) **от целевых VU**.
+
+### Что тестируется
+
+| Направление | Метод | Эндпоинт | Назначение |
+|-------------|--------|----------|------------|
+| Создание «простой» сущности (без ссылок на другие сущности в теле запроса) | `POST` | `/api/films` | JSON: `title`, `genre`, `durationMinutes` |
+| Статистика (агрегация по билетам/фильму) | `GET` | `/api/tickets/analytics/max-viewers?filmId=…` | Аналитика; для сида обычно `filmId=1` |
+
+Доля **POST / GET** настраивается переменной **`POST_SHARE`** в `[0..1]` (по умолчанию **0.5**, т.е. 50/50).
+
+### Скрипты (коммитятся в репозиторий)
+
+| Файл | Описание |
+|------|----------|
+| `k6/cinema-mixed.js` | Профиль k6: **`executor: 'ramping-vus'`**, пакет **`k6/http`**, чередование POST и GET по `POST_SHARE` |
+| `k6/run-sweep.sh` | Серия прогонов **10 → 20 → 40 → 80 → 160**; перед стартом **очищает** `k6/reports` (JSON/PNG); после прогонов при необходимости ставит **`matplotlib`** и строит **`avg_vs_vus.png`**. Опции: **`NO_CLEAN=1`**, **`NO_PLOT=1`**, **`USE_DOCKER_K6=1`**. |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** (поддерживаются старый и новый формат `--summary-export`: `values.avg` и плоское `avg` у k6 v1.x). |
+
+Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
+
+### Подготовка
+
+1. Запустите API (например `docker compose up -d` или `./gradlew bootRun`), убедитесь, что доступен **`http://localhost:8080`** и в БД есть фильм с id **`1`** (Flyway `V2`), либо задайте **`FILM_ID`**.
+
+2. Установите k6 **или** используйте Docker (см. ниже).
+
+3. **matplotlib** для графика подтянет сам **`./k6/run-sweep.sh`** (`pip install --user` при первом запуске). Вручную при необходимости: `pip install "matplotlib>=3.7"`.
+
+### Один прогон (ручной пример)
+
+```bash
+export BASE_URL=http://localhost:8080
+export TARGET_VUS=20
+export POST_SHARE=0.5
+export FILM_ID=1
+k6 run k6/cinema-mixed.js
+```
+
+Экспорт метрик в JSON:
+
+```bash
+k6 run --summary-export k6/reports/summary-vus-20.json k6/cinema-mixed.js
+```
+
+### Серия прогонов и график (рекомендуется для отчёта)
+
+Одна команда: очистка старых отчётов в `k6/reports`, пять прогонов k6, затем график **`avg_vs_vus.png`** (и при необходимости установка matplotlib в user-site):
+
+```bash
+./k6/run-sweep.sh
+```
+
+Не удалять прошлые JSON/PNG перед прогоном: **`NO_CLEAN=1 ./k6/run-sweep.sh`**. Только метрики без графика: **`NO_PLOT=1 ./k6/run-sweep.sh`**.
+
+Переменные окружения для sweep: **`BASE_URL`**, **`FILM_ID`**, **`POST_SHARE`** (как в `cinema-mixed.js`).
+
+Если **k6 не установлен**, но есть Docker:
+
+```bash
+USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
+```
+
+На Linux при необходимости скрипт добавляет `host.docker.internal` через `host-gateway`. Если обращение к API не проходит, используйте IP хоста или опубликуйте порт приложения в сети Docker.
+
+### Критерии соответствия ТЗ (кратко)
+
+- Используются **`ramping-vus`** и **`k6/http`**.
+- Нагрузка: **POST** создание простой сущности + **GET** эндпоинт **статистики**; пропорция **настраиваемая** (`POST_SHARE`).
+- Несколько уровней нагрузки (**4–5 точек**, удвоение VU) и **график avg vs VU** через `plot_avg_vs_vus.py`.
+
 ## Локальные адреса и порты
 
 | Адрес | Сервис | Назначение |
 |-------|--------|------------|
-| `http://localhost:8080` | Spring Boot | Основное приложение (веб-сервер / REST API) |
+| `http://localhost:8080` | Spring Boot | Приложение (в т.ч. из контейнера `app` при полном `docker compose up`) |
 | `http://localhost:15432` | pgAdmin 4 | Веб-интерфейс для визуального управления БД |
 | `localhost:5432` | PostgreSQL | База данных (используется приложением для подключения) |
 
