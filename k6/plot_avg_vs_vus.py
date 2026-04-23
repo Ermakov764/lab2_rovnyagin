@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-LAB4: строит график среднего времени отклика (avg http_req_duration, мс) vs целевых VU
-по JSON-файлам, сохранённым k6 с флагом --summary-export.
+LAB4: график среднего времени отклика (мс) vs TARGET_VU по summary-vus-*.json.
 
-Зависимость (один раз): pip install "matplotlib>=3.7"
+Если в JSON есть кастомные метрики k6 (Trend) из cinema-mixed.js:
+  k6_post_film_ms, k6_get_analytics_ms — строятся две линии с подписями (легенда).
+Иначе — одна линия по общему http_req_duration (старые отчёты).
+
+Зависимость: pip install "matplotlib>=3.7"
 """
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -12,25 +17,42 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+# Имена Trend-метрик в k6/cinema-mixed.js (должны совпадать)
+METRIC_POST = "k6_post_film_ms"
+METRIC_GET = "k6_get_analytics_ms"
+METRIC_ALL = "http_req_duration"
 
-def extract_avg_ms(summary: dict) -> Optional[float]:
-    """Среднее http_req_duration (мс) из summary-export. Формат JSON менялся между версиями k6."""
-    metrics = summary.get("metrics") or {}
-    trend = metrics.get("http_req_duration") or {}
-    # Старые k6: metrics.http_req_duration.values.avg
+
+def extract_avg_from_trend(trend: dict) -> Optional[float]:
+    """Среднее из блока метрики k6 summary (старый и новый формат)."""
+    if not trend:
+        return None
     values = trend.get("values")
     if isinstance(values, dict):
         avg = values.get("avg")
         if avg is not None:
             return float(avg)
-    # k6 v1.x: avg сразу в metrics.http_req_duration
     avg = trend.get("avg")
     return float(avg) if avg is not None else None
 
 
-def collect_points(reports_dir: Path) -> List[Tuple[int, float]]:
+def extract_metric(summary: dict, name: str) -> Optional[float]:
+    metrics = summary.get("metrics") or {}
+    return extract_avg_from_trend(metrics.get(name) or {})
+
+
+def collect_series(
+    reports_dir: Path,
+) -> Tuple[
+    List[Tuple[int, float]],
+    List[Tuple[int, float]],
+    List[Tuple[int, float]],
+]:
     pat = re.compile(r"^summary-vus-(\d+)\.json$")
-    out: List[Tuple[int, float]] = []
+    post_pts: List[Tuple[int, float]] = []
+    get_pts: List[Tuple[int, float]] = []
+    legacy_pts: List[Tuple[int, float]] = []
+
     for path in sorted(reports_dir.glob("summary-vus-*.json")):
         m = pat.match(path.name)
         if not m:
@@ -38,30 +60,41 @@ def collect_points(reports_dir: Path) -> List[Tuple[int, float]]:
         vus = int(m.group(1))
         with path.open(encoding="utf-8") as f:
             data = json.load(f)
-        avg = extract_avg_ms(data)
-        if avg is None:
-            print(f"Предупреждение: нет metrics.http_req_duration.values.avg в {path}", file=sys.stderr)
-            continue
-        out.append((vus, avg))
-    out.sort(key=lambda t: t[0])
-    return out
+
+        p = extract_metric(data, METRIC_POST)
+        g = extract_metric(data, METRIC_GET)
+        if p is not None:
+            post_pts.append((vus, p))
+        if g is not None:
+            get_pts.append((vus, g))
+
+        total = extract_metric(data, METRIC_ALL)
+        if total is not None:
+            legacy_pts.append((vus, total))
+        elif p is None and g is None:
+            print(f"Предупреждение: нет метрик для графика в {path}", file=sys.stderr)
+
+    post_pts.sort(key=lambda t: t[0])
+    get_pts.sort(key=lambda t: t[0])
+    legacy_pts.sort(key=lambda t: t[0])
+    return post_pts, get_pts, legacy_pts
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="График avg времени отклика k6 vs VU")
+    p = argparse.ArgumentParser(description="График avg времени отклика k6 vs VU (POST / GET раздельно)")
     p.add_argument(
         "reports_dir",
         nargs="?",
         default="k6/reports",
         type=Path,
-        help="Каталог с summary-vus-*.json (по умолчанию k6/reports)",
+        help="Каталог с summary-vus-*.json",
     )
     p.add_argument(
         "-o",
         "--output",
         type=Path,
         default=None,
-        help="PNG-файл (по умолчанию <reports_dir>/avg_vs_vus.png)",
+        help="PNG (по умолчанию <reports_dir>/avg_vs_vus.png)",
     )
     args = p.parse_args()
     reports_dir = args.reports_dir.resolve()
@@ -69,24 +102,38 @@ def main() -> None:
         print(f"Каталог не найден: {reports_dir}", file=sys.stderr)
         sys.exit(1)
 
-    points = collect_points(reports_dir)
-    if len(points) < 2:
-        print("Нужно минимум 2 файла summary-vus-*.json с валидными avg.", file=sys.stderr)
+    post_pts, get_pts, legacy_pts = collect_series(reports_dir)
+
+    split_ok = len(post_pts) >= 1 and len(get_pts) >= 1
+    if not split_ok and len(legacy_pts) < 2:
+        print("Нужно минимум 2 точки (legacy http_req_duration) или данные POST+GET.", file=sys.stderr)
         sys.exit(1)
+
     try:
         import matplotlib.pyplot as plt
     except ImportError:
         print('Установите matplotlib: pip install "matplotlib>=3.7"', file=sys.stderr)
         sys.exit(1)
 
-    vus_list, avg_list = zip(*points)
     out_path = args.output or (reports_dir / "avg_vs_vus.png")
+    plt.figure(figsize=(9, 5.5))
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(vus_list, avg_list, "o-", linewidth=2, markersize=8)
+    if split_ok:
+        vp, yp = zip(*post_pts)
+        vg, yg = zip(*get_pts)
+        plt.plot(vp, yp, "o-", linewidth=2, markersize=7, color="#1f77b4", label="POST /api/films")
+        plt.plot(vg, yg, "s-", linewidth=2, markersize=7, color="#ff7f0e", label="GET /api/tickets/analytics/max-viewers")
+        plt.legend(loc="upper left", framealpha=0.9)
+        title = "k6: средняя задержка vs TARGET_VUS (отдельно POST и GET)"
+    else:
+        v, y = zip(*legacy_pts)
+        plt.plot(v, y, "o-", linewidth=2, markersize=8, color="#444444", label="Все запросы (http_req_duration)")
+        plt.legend(loc="upper left", framealpha=0.9)
+        title = "k6: средняя задержка vs TARGET_VUS (общий http_req_duration; перезапустите k6 для раздельных кривых)"
+
     plt.xlabel("Целевые VU (TARGET_VUS)")
-    plt.ylabel("Среднее время отклика http_req_duration (мс)")
-    plt.title("k6: средняя задержка vs нагрузка (POST /api/films + GET analytics)")
+    plt.ylabel("Среднее время отклика (мс)")
+    plt.title(title)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)

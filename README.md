@@ -1,6 +1,10 @@
-# Лабораторная работа №3–5: Cinema (Docker + Spring Boot + JPA + Flyway + k6)
+# Лабораторная работа №5: «Кинотеатр» (Cinema)
 
-**№3:** контейнер приложения (`Dockerfile`), Flyway (**DDL + стартовый DML** в `V2`), полный стек в Docker Compose (`postgresdb`, `app`, `pgadmin`). **№4:** нагрузочное тестирование [Grafana k6](https://k6.io/) — смешанная нагрузка POST/GET, серия прогонов с ростом VU, график средней задержки vs нагрузка. **№5:** Python-скрипт (`requests` + Faker) и REST-эндпоинты очистки таблиц для **массового** сида перед k6. REST + HTML; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
+Учебный проект: **Spring Boot 4**, **Spring Data JPA**, **PostgreSQL**, **Flyway**, **Docker Compose** (приложение, БД, **pgAdmin**). Предметная область — бронирование билетов (**Film**, **Viewer**, **Ticket**): REST API, HTML-формы, аналитика по билетам. Опциональный профиль **`inmemory`** (без БД).
+
+**Фокус лаб. 5:** подготовка данных перед нагрузочными тестами — эндпоинты **`DELETE /api/admin/clear/*`**, Python-скрипт **`tools/seed_rest_data.py`** (`requests` + **Faker**), обёртка **`tools/run-seed.sh`**. Ранее по курсу в том же репозитории: контейнеризация и миграции (**лаб. 3**), сценарии **[k6](https://k6.io/)** (**лаб. 4**).
+
+**Навигация:** ниже по порядку — таблицы **эндпоинтов**, **требования**, **быстрый старт** (Docker), **профили**, **миграции**, **лаб. 5** (сидирование), **лаб. 4** (k6), описание проекта, **структура**, **SQL**, **порты**.
 
 ## Эндпоинты
 
@@ -56,7 +60,7 @@
 | GET | `/api/tickets/analytics/max-viewers?filmId=...` | Найти день с максимальным числом уникальных зрителей для выбранного фильма. |
 | GET | `/api/tickets/analytics/top-film-by-day?date=YYYY-MM-DD` | Найти самый посещаемый фильм за указанную дату. |
 
-### REST API: администрирование (лаб. 5, только БД; профиль не `inmemory`)
+### REST API: администрирование (очистка таблиц; только БД, профиль не `inmemory`)
 
 | Метод | Путь | Назначение |
 |---|---|---|
@@ -73,9 +77,9 @@
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
 - **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
-- **Лаб. 5:** Python 3 + зависимости сидера: `pip install -r tools/requirements-seed.txt`
+- **Лаб. 5:** Python 3.10+; зависимости сидера — `pip install -r tools/requirements-seed.txt` **или** запуск **`./tools/run-seed.sh`** (на Linux при ограничении системного `pip`, PEP 668, скрипт создаёт **`tools/.venv`** и ставит пакеты туда)
 
-## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
+## Быстрый старт: Docker Compose
 
 1) Поднять **весь стек** (PostgreSQL + приложение + pgAdmin), при необходимости пересобрать образ приложения:
 
@@ -170,7 +174,9 @@ docker compose down -v
 - `POST /viewers/page/create`
 - `POST /tickets/page/create`
 
-## Миграции и БД (лаб. 3: DDL + DML в Flyway; лаб. 5: доп. сид через REST)
+## Миграции и БД
+
+Схема и небольшой стартовый набор строк задаются **Flyway** при старте приложения; массовое наполнение перед k6 — через **`tools/`** (лаб. 5).
 
 - Каталог: `src/main/resources/db/migration`
   - `V1__create_schema.sql` — **DDL** (создание таблиц `viewers`, `films`, `tickets`, ключи и ограничения)
@@ -215,11 +221,12 @@ docker compose down -v
 
 - Пошаговый runbook: `docs/RUNBOOK.md`
 - Verification checklist (Task 07): `docs/verification-checklist.md`
+
 ## Подробный runbook
 
 **Требования:** Java 25, Docker Desktop (или Docker Engine + Compose), Gradle Wrapper (`./gradlew`).
 
-### 1. Полный стенд (лаб. 3): БД + приложение + pgAdmin в Compose
+### 1. Полный стенд: БД + приложение + pgAdmin в Compose
 
 В корне проекта:
 
@@ -292,7 +299,7 @@ docker compose down
 ```
 ---
 ## Описание проекта
-Проект демонстрирует работу с реляционной базой данных PostgreSQL через Spring Data JPA в предметной области «Кинотеатр» и **развёртывание приложения и БД в Docker Compose** (лабораторная №3).
+Проект демонстрирует работу с PostgreSQL через Spring Data JPA в области «Кинотеатр» и **развёртывание в Docker Compose**.
 Реализована система бронирования билетов, включающая связь One-to-Many между сущностями:
 - Film (Фильм): один фильм может иметь много билетов.
 - Viewer (Зритель): один зритель может купить много билетов.
@@ -348,6 +355,8 @@ docker compose down
 | Docker / Compose | - | Контейнеры БД, pgAdmin и приложения |
 | Dockerfile | multi-stage Temurin 25 | Сборка и запуск Spring Boot в контейнере |
 | Gradle | wrapper | Сборка и запуск проекта |
+| Python | 3.10+ | Сидирование: `requests`, `faker`; график k6: `matplotlib` |
+| k6 | см. [документацию](https://k6.io/docs/) | Нагрузочное тестирование (лаб. 4) |
 
 ---
 
@@ -355,7 +364,7 @@ docker compose down
 
 ```text
 lab2_rovnyagin/
-├── Dockerfile                      # Образ приложения (лаб. 3)
+├── Dockerfile                      # Образ приложения (multi-stage)
 ├── src/main/java/ru/hse/lab2/
 │   ├── Lab2Application.java        # Точка входа
 │   ├── entity/
@@ -565,15 +574,33 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 | Файл | Назначение |
 |------|------------|
-| `tools/seed_rest_data.py` | `argparse`: `--base-url` (по умолчанию `http://localhost:8080`), `--count` (по умолчанию **500**), `--endpoint` **`films` \| `viewers` \| `tickets` \| `all`**. Сначала вызывает соответствующий `DELETE /api/admin/clear/...`, затем серию `POST` на `/api/films`, `/api/viewers`, `/api/tickets`. |
-| `tools/run-seed.sh` | Обёртка в духе `k6/run-sweep.sh`: при необходимости ставит зависимости из `requirements-seed.txt`; без аргументов — `BASE_URL` / `ENDPOINT` / `COUNT` из окружения (дефолты как у Python); с аргументами — проксирует их в `seed_rest_data.py`. |
+| `tools/seed_rest_data.py` | `--base-url`, `--endpoint` **`films` \| `viewers` \| `tickets` \| `all`**, `--count` (по умолчанию **500**; при **`--clear`** не нужен). **`--clear`** — только очистка: `films` → clear/films; `viewers` → clear/viewers; `tickets` → те же билеты+зрители (`clear/viewers`); `all` → clear/all. Сидирование: `films`/`viewers` — как раньше; **`tickets`** — `clear/tickets`, затем **`max(1, count // divisor)`** фильмов и столько же зрителей (`--divisor`, по умолчанию **10**), затем **`count`** билетов; **`all`** — по **`count`** каждого типа. |
+| `tools/run-seed.sh` | Обёртка в духе `k6/run-sweep.sh`. Если нет `requests`/`faker`, создаёт **`tools/.venv`** и ставит зависимости туда (удобно при **PEP 668** / запрете системного `pip`). Без аргументов — `BASE_URL` / `ENDPOINT` / `COUNT` из окружения; с аргументами — проксирует в `seed_rest_data.py`. Переменная **`NO_PIP_INSTALL=1`** — не трогать venv/pip. |
 | `tools/requirements-seed.txt` | `requests`, `faker` |
 
-Установка зависимостей:
+Установка зависимостей (вручную, если не используете `run-seed.sh`):
 
 ```bash
 pip install -r tools/requirements-seed.txt
+# либо виртуальное окружение:
+python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements-seed.txt
 ```
+
+### Типовая цепочка: стенд → сид → k6
+
+1. Поднять API с актуальным кодом (после изменений Java — **`docker compose up -d --build`**, иначе в контейнере может не быть `/api/admin/clear/*`).
+2. **`./tools/run-seed.sh`** (или `COUNT=100 ENDPOINT=all ./tools/run-seed.sh`).
+3. **`./k6/run-sweep.sh`** (при необходимости задать **`FILM_ID`** на существующий фильм — см. `GET /api/films`).
+
+### Проверка и частые ситуации
+
+| Симптом | Что делать |
+|--------|------------|
+| `GET /api/films` → `[]` | После **`clear`** таблицы пустые — снова запустите сидер; либо проверьте, что смотрите ту же БД, что и приложение. |
+| `DELETE /api/admin/clear/...` → не **204** | Профиль **`inmemory`** не поддерживает clear; убедитесь, что образ **`app`** пересобран с классами `AdminMaintenance*`. |
+| Данные в pgAdmin есть, API пустой | Разные хост/БД/порт в настройках подключения; сравните с `application.properties` / `application-docker.properties`. |
+
+**IntelliJ IDEA:** Run **`Lab2Application`** (профиль не **`inmemory`**, PostgreSQL доступна), затем в терминале IDE: **`./tools/run-seed.sh`** или Run-конфигурация для **`seed_rest_data.py`** с аргументами `--endpoint all --count 50`.
 
 Примеры:
 
@@ -589,7 +616,9 @@ python3 tools/seed_rest_data.py --endpoint films --count 500
 # фильмы + зрители + билеты (по count записей каждого типа)
 python3 tools/seed_rest_data.py --endpoint all --count 200
 
-python3 tools/seed_rest_data.py --endpoint tickets --count 300 --base-url http://localhost:8080
+python3 tools/seed_rest_data.py --endpoint tickets --count 100 --divisor 10
+python3 tools/seed_rest_data.py --endpoint viewers --clear
+python3 tools/seed_rest_data.py --endpoint tickets --clear
 
 ./tools/run-seed.sh --endpoint all --count 50 --base-url http://localhost:8080
 ```
@@ -613,15 +642,15 @@ python3 tools/seed_rest_data.py --endpoint tickets --count 300 --base-url http:/
 | Создание «простой» сущности (без ссылок на другие сущности в теле запроса) | `POST` | `/api/films` | JSON: `title`, `genre`, `durationMinutes` |
 | Статистика (агрегация по билетам/фильму) | `GET` | `/api/tickets/analytics/max-viewers?filmId=…` | Аналитика; для сида обычно `filmId=1` |
 
-Доля **POST / GET** настраивается переменной **`POST_SHARE`** в `[0..1]` (по умолчанию **0.5**, т.е. 50/50).
+Доля нагрузки **POST / GET** задаётся **`POST_SHARE`** в `[0..1]`: **`TARGET_VUS`** делится между двумя параллельными сценариями k6 (пул только POST и пул только GET), без случайного выбора внутри одной итерации.
 
 ### Скрипты (коммитятся в репозиторий)
 
 | Файл | Описание |
 |------|----------|
-| `k6/cinema-mixed.js` | Профиль k6: **`executor: 'ramping-vus'`**, пакет **`k6/http`**, чередование POST и GET по `POST_SHARE` |
+| `k6/cinema-mixed.js` | Два параллельных сценария **`ramping-vus`**: **`post_films`** (POST `/api/films`) и **`get_analytics`** (GET аналитики); доля VU между ними — **`POST_SHARE`** от **`TARGET_VUS`**, пакет **`k6/http`**. |
 | `k6/run-sweep.sh` | Серия прогонов **10 → 20 → 40 → 80 → 160**; перед стартом **очищает** `k6/reports` (JSON/PNG); после прогонов при необходимости ставит **`matplotlib`** и строит **`avg_vs_vus.png`**. Опции: **`NO_CLEAN=1`**, **`NO_PLOT=1`**, **`USE_DOCKER_K6=1`**. |
-| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`** (поддерживаются старый и новый формат `--summary-export`: `values.avg` и плоское `avg` у k6 v1.x). |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`**: две линии **POST** и **GET** по метрикам `k6_post_film_ms` / `k6_get_analytics_ms` из `cinema-mixed.js`; для старых JSON без них — одна линия по `http_req_duration`. |
 
 Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
 
@@ -672,7 +701,7 @@ USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
 ### Критерии соответствия ТЗ (кратко)
 
 - Используются **`ramping-vus`** и **`k6/http`**.
-- Нагрузка: **POST** создание простой сущности + **GET** эндпоинт **статистики**; пропорция **настраиваемая** (`POST_SHARE`).
+- Нагрузка: **POST** создание простой сущности + **GET** статистики; **два параллельных пула** VU, пропорция **`POST_SHARE`** от **`TARGET_VUS`**.
 - Несколько уровней нагрузки (**4–5 точек**, удвоение VU) и **график avg vs VU** через `plot_avg_vs_vus.py`.
 
 ## Локальные адреса и порты
