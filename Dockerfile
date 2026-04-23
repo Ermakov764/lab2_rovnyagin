@@ -1,12 +1,18 @@
+# syntax=docker/dockerfile:1
+# Кэш ~/.gradle между сборками (нужен BuildKit: docker compose build включает его по умолчанию)
 FROM eclipse-temurin:25-jdk-noble AS build
 WORKDIR /app
 
 COPY gradle gradle
 COPY gradlew build.gradle settings.gradle ./
-RUN chmod +x gradlew
+# Отдельный слой: тянет Gradle wrapper + Maven-зависимости (кэш переживает пересборки)
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x gradlew \
+    && ./gradlew --no-daemon dependencies --quiet
 
 COPY src src
-RUN ./gradlew bootJar --no-daemon
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew --no-daemon bootJar
 
 FROM eclipse-temurin:25-jre-noble
 WORKDIR /app

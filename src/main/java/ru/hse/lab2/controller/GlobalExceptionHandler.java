@@ -19,7 +19,17 @@ import ru.hse.lab2.debug.DebugProbe;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 
-@RestControllerAdvice
+/**
+ * Только наши контроллеры — иначе {@link #handleUnexpected} перехватывает сбои SpringDoc
+ * ({@code /v3/api-docs}, {@code /swagger-ui.html}) и отдаёт JSON с «Unexpected server error».
+ */
+@RestControllerAdvice(assignableTypes = {
+        HtmlPageController.class,
+        FilmRestController.class,
+        ViewerRestController.class,
+        TicketRestController.class,
+        AdminMaintenanceController.class
+})
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)

@@ -12,6 +12,9 @@ out/
 # OS
 .DS_Store
 
+# Локальные секреты / параметры Compose (лаб. 6)
+.env
+
 # Python (лаб. 5)
 tools/.venv/
 tools/__pycache__/

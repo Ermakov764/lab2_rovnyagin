@@ -46,7 +46,7 @@ public class HtmlPageController {
     public String homePage() {
         return """
                 <!doctype html>
-                <html lang="en">
+                <html lang="ru">
                 <head>
                   <meta charset="UTF-8" />
                   <title>Cinema Lab2</title>
@@ -57,11 +57,12 @@ public class HtmlPageController {
                 </head>
                 <body>
                   <h1>Cinema Lab2</h1>
-                  <p>Web layer is available. Choose a page:</p>
+                  <p>Доступен веб-слой. Выберите раздел:</p>
                   <nav>
                     <a href="/films/page">Films</a>
                     <a href="/viewers/page">Viewers</a>
                     <a href="/tickets/page">Tickets</a>
+                    <a href="/swagger-ui.html">Swagger UI</a>
                   </nav>
                 </body>
                 </html>
@@ -299,6 +300,7 @@ public class HtmlPageController {
                     <a href="/films/page">Films</a>
                     <a href="/viewers/page">Viewers</a>
                     <a href="/tickets/page">Tickets</a>
+                    <a href="/swagger-ui.html">Swagger UI</a>
                   </nav>
                 """ + body + """
                 </body>

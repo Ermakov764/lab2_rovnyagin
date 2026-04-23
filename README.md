@@ -4,9 +4,24 @@
 
 **Фокус лаб. 5:** подготовка данных перед нагрузочными тестами — эндпоинты **`DELETE /api/admin/clear/*`**, Python-скрипт **`tools/seed_rest_data.py`** (`requests` + **Faker**), обёртка **`tools/run-seed.sh`**. Ранее по курсу в том же репозитории: контейнеризация и миграции (**лаб. 3**), сценарии **[k6](https://k6.io/)** (**лаб. 4**).
 
-**Навигация:** ниже по порядку — таблицы **эндпоинтов**, **требования**, **быстрый старт** (Docker), **профили**, **миграции**, **лаб. 5** (сидирование), **лаб. 4** (k6), описание проекта, **структура**, **SQL**, **порты**.
+**Фокус лаб. 6** (см. **`ТЗ_6лаба.txt`**): развёртывание на учебной ВМ, образ приложения в **Docker Hub** (**`docker compose push` / `pull`**), **лимиты CPU/RAM** сервиса `app` в Compose, **переменные окружения** для JDBC и Tomcat (`server.tomcat.threads.max`), отключение **`spring.jpa.show-sql`**, доступ через **SSH-туннель**, нагрузочные прогоны **k6 с постоянными VU** и соотношениями POST/GET **5/95, 50/50, 95/5** для графиков «время отклика vs число CPU».
+
+**Навигация:** ниже по порядку — таблицы **эндпоинтов** (в т.ч. **OpenAPI / Swagger**), **требования**, **быстрый старт** (Docker), **обновление контейнера после правок кода**, **профили**, **миграции**, **лаб. 6** (VM, env, лимиты, k6), **лаб. 5** (сидирование), **лаб. 4** (k6), описание проекта, **структура**, **SQL**, **порты**.
 
 ## Эндпоинты
+
+### OpenAPI / Swagger UI (документация REST)
+
+Подключён **SpringDoc OpenAPI 3** (`springdoc-openapi-starter-webmvc-ui`). В спецификацию попадают только пути **`/api/**`** (HTML-страницы и служебные пути в Swagger не дублируются).
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/v3/api-docs` | OpenAPI 3 в формате JSON. |
+| GET | `/swagger-ui.html` | Интерактивная документация и **Try it out** для REST. |
+
+На главной HTML-странице (`GET /`) в навигации есть ссылка **Swagger UI**. **Один порт** (по умолчанию **8080**) обслуживает и веб-страницы, и REST, и Swagger — это нормальная схема для Spring Boot.
+
+**Важно:** глобальный обработчик ошибок приложения настроен только на контроллеры пакета `ru.hse.lab2.controller`, чтобы не маскировать сбои SpringDoc ответом «Unexpected server error».
 
 ### HTML (страницы и формы)
 
@@ -81,16 +96,24 @@
 
 ## Быстрый старт: Docker Compose
 
-1) Поднять **весь стек** (PostgreSQL + приложение + pgAdmin), при необходимости пересобрать образ приложения:
+1) Поднять **весь стек** (PostgreSQL + приложение + pgAdmin).
 
-```bash
-docker compose up -d --build
-```
+- **Первый раз / локальная разработка:** собрать приложение и поднять всё:
+  ```bash
+  docker compose up -d --build
+  ```
+- **Сервер + образ уже в Docker Hub:** подтянуть только приложение и поднять стек:
+  ```bash
+  docker compose pull app
+  docker compose up -d
+  ```
+
+Подробнее про **push/pull** образа **`app`** — в разделе **«Лабораторная работа №6»**, подпункт **Docker Hub**.
 
 2) Проверить приложение:
 
 - в логах: `docker compose logs -f app` — должно быть `Started Lab2Application`;
-- в браузере: `http://localhost:8080/` (HTML), например `http://localhost:8080/api/films` (REST).
+- в браузере: `http://localhost:8080/` (HTML), `http://localhost:8080/swagger-ui.html` (Swagger), `http://localhost:8080/v3/api-docs` (JSON OpenAPI), например `http://localhost:8080/api/films` (REST).
 
 3) Остановить:
 
@@ -104,7 +127,39 @@ docker compose down
 docker compose down -v
 ```
 
-**Вариант для разработки на хосте:** временно отключите сервис `app` в `docker-compose.yml` (или смените ему публикацию порта), поднимите остальные сервисы и выполните `./gradlew bootRun` — см. **«Подробный runbook»**, п. 2.
+**Вариант для разработки на хосте:** сервис **`app` в Docker и `./gradlew bootRun` на хосте не могут одновременно слушать один и тот же порт 8080.** Либо остановите контейнер приложения (`docker stop lab2_app`), либо поднимите локальный запуск на другом порту: `SERVER_PORT=8081 ./gradlew bootRun`. Подробнее — в **«Подробный runbook»**, п. 2.
+
+## Обновление приложения в Docker (после правок Java / HTML в контроллерах)
+
+Имя образа задаётся **`DOCKER_IMAGE_APP`** (см. **`.env`**). Внутри контейнера **`lab2_app`** выполняется собранный **`app.jar`**. Пока не подтянут **новый** образ и не пересоздан контейнер, в браузере будет старая версия.
+
+**Вариант A — Docker Hub (как на учебном сервере):** на машине с исходниками после правок:
+
+```bash
+docker compose build app
+docker compose push app
+```
+
+На сервере:
+
+```bash
+docker compose pull app
+docker compose up -d --force-recreate app
+```
+
+**Вариант B — только локально, без Hub:**
+
+```bash
+docker compose up -d --build --force-recreate app
+```
+
+Полная пересборка без кэша: **`docker compose build --no-cache app`** (затем **`push`** или **`up`**).
+
+**Проверка, что отдаётся новая главная** (плашка с пояснением про порт в текущей версии кода отсутствует):
+
+```bash
+curl -s http://localhost:8080/ | grep -i 'Почему сайт' || echo "OK: старого текста нет"
+```
 
 ## Профили запуска
 
@@ -234,29 +289,38 @@ docker compose down -v
 docker compose up -d --build
 ```
 
+После изменения кода: **локально** — `docker compose up -d --build --force-recreate app`; **через Hub** — `docker compose build app && docker compose push app`, на сервере — `docker compose pull app && docker compose up -d --force-recreate app`.
+
 Дождитесь **Healthy** у `postgresdb` и успешного старта контейнера приложения (`docker compose ps`, `docker compose logs app`).
 
 ### 2. Запуск приложения на хосте при БД в Docker
 
-Поднимите контейнеры (если сервис `app` включён и занимает `8080`, отключите его в `docker-compose.yml` или смените порт для локального `bootRun`):
+Поднимите **только инфраструктуру**, если не хотите конфликт порта **8080** с контейнером `lab2_app`:
 
 ```bash
-docker compose up -d
+docker compose up -d postgresdb pgadmin
 ```
 
-Затем:
+Либо поднимите всё, но тогда **остановите** приложение в Docker перед локальным запуском:
 
 ```bash
+docker stop lab2_app
 ./gradlew bootRun
 ```
 
-Если порт `8080` занят:
+Если **`lab2_app` запущен** на `8080`, `bootRun` завершится с ошибкой *Port 8080 was already in use*. Варианты: остановить контейнер (см. выше) или запустить локально на другом порту:
+
+```bash
+SERVER_PORT=8081 ./gradlew bootRun
+```
+
+или:
 
 ```bash
 ./gradlew bootRun --args='--server.port=8081'
 ```
 
-Альтернатива в IntelliJ IDEA: запустите класс `Lab2Application.java` как Gradle/Spring Boot приложение.
+Альтернатива в IntelliJ IDEA: переменная окружения **`SERVER_PORT=8081`** в Run Configuration или аргумент **`--server.port=8081`**, если Docker держит **8080**.
 
 ### 2.1 Режим совместимости `inmemory` (opt-in)
 По умолчанию приложение работает в режиме `JPA + Flyway + PostgreSQL`.
@@ -276,7 +340,7 @@ docker compose up -d
 
 В логах контейнера `app` или консоли `bootRun` должно быть: `Started Lab2Application in ... seconds`. После старта Flyway применит миграции `V1` и `V2`.
 
-Корневой URL (`http://localhost:8080/`, если порт не меняли) обслуживается `HtmlPageController` и возвращает HTML home page.
+Корневой URL (`http://localhost:8080/`, если порт не меняли) обслуживается `HtmlPageController` и возвращает HTML home page. Документация REST: **`/swagger-ui.html`**, **`/v3/api-docs`**.
 
 ### 4. Postman: где файлы и smoke-check
 Postman-артефакты лежат в директории `postman/`:
@@ -355,6 +419,7 @@ docker compose down
 | Docker / Compose | - | Контейнеры БД, pgAdmin и приложения |
 | Dockerfile | multi-stage Temurin 25 | Сборка и запуск Spring Boot в контейнере |
 | Gradle | wrapper | Сборка и запуск проекта |
+| SpringDoc OpenAPI | 3.x (starter webmvc-ui) | `/v3/api-docs`, Swagger UI |
 | Python | 3.10+ | Сидирование: `requests`, `faker`; график k6: `matplotlib` |
 | k6 | см. [документацию](https://k6.io/docs/) | Нагрузочное тестирование (лаб. 4) |
 
@@ -367,6 +432,8 @@ lab2_rovnyagin/
 ├── Dockerfile                      # Образ приложения (multi-stage)
 ├── src/main/java/ru/hse/lab2/
 │   ├── Lab2Application.java        # Точка входа
+│   ├── config/OpenApiConfig.java   # Заголовок/описание OpenAPI для Swagger
+│   ├── controller/                 # REST, HTML (`HtmlPageController`), admin clear, `GlobalExceptionHandler`
 │   ├── entity/
 │   │   ├── Film.java               # Сущность "Фильм"
 │   │   ├── Viewer.java             # Сущность "Зритель"
@@ -376,12 +443,13 @@ lab2_rovnyagin/
 │       ├── ViewerRepository.java   # CRUD для зрителей
 │       └── TicketRepository.java   # CRUD + аналитические запросы
 ├── src/main/resources/
-│   ├── application.properties       # Конфигурация (хост: localhost)
+│   ├── application.properties       # Конфигурация (хост: localhost), порт, `springdoc.paths-to-match=/api/**`
 │   ├── application-docker.properties # URL БД для контейнера (postgresdb)
 │   └── db/migration/               # Flyway: V1 DDL, V2 DML
-├── docker-compose.yml # postgresdb + app + pgadmin
+├── docker-compose.yml # postgresdb + app + pgadmin; лаб. 6: limits, env для JDBC/Tomcat/JPA
+├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
 ├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
-├── k6/                 # Лаб. 4: k6 (cinema-mixed.js, run-sweep.sh, plot_avg_vs_vus.py)
+├── k6/                 # Лаб. 4/6: cinema-mixed.js, cinema-lab6-constant.js, run-sweep.sh, run-lab6-ratio-sweep.sh
 └── README.md                       # Этот файл
 ```
 
@@ -566,6 +634,107 @@ SET price = 600.0
 WHERE film_id = 1 AND session_date = '2026-04-25';
 ```
 
+## Лабораторная работа №6: ВМ, Docker, env, лимиты ресурсов, SSH, k6
+
+Текст задания: **`ТЗ_6лаба.txt`**. Ниже — что уже **реализовано в репозитории** и как этим пользоваться на сервере и локально.
+
+### Подготовка на ВМ (выполняете вы)
+
+- Подключение по SSH (порт из [таблицы курса](https://docs.google.com/spreadsheets/); пример для порта **2303**):  
+  `ssh -p 2303 hl@hlssh.zil.digital`
+- Обновление ОС, **`~/.ssh/authorized_keys`** со своим `id_rsa.pub`, **git**, ключ для GitHub, **`docker login`**, клонирование репозитория — по методичке; пароли пользователей **`hl`** и **root** не менять.
+
+### Образ приложения в Docker Hub (сборка → push, на сервере → pull)
+
+Сервис **`app`** в **`docker-compose.yml`** использует **`image: ${DOCKER_IMAGE_APP:-…}`** и **`build:`**: локально (или в CI) образ **собирается и тегируется** тем же именем, что потом пушится в Hub; **на учебной ВМ** достаточно **`git pull`** репозитория (compose-файл + `.env`), **`docker login`** и подтянуть образ **без сборки Gradle на сервере**.
+
+1. На [Docker Hub](https://hub.docker.com/) создайте **публичный** репозиторий, например **`lab2_rovnyagin`** (имя должно совпадать с путём образа).
+2. В **`.env`** задайте **`DOCKER_IMAGE_APP=<ваш_логин>/lab2_rovnyagin:latest`** (по умолчанию в репозитории указан пример **`lavrentiyermakov/lab2_rovnyagin:latest`** — замените логин при необходимости).
+3. Для **`docker push`** нужен токен с правами **Read & Write** (не только *Public read-only*). Выполните **`docker login`**, затем на машине, где собираете образ:
+   ```bash
+   docker compose build app
+   docker compose push app
+   ```
+4. **На сервере** (после `docker login` тем же аккаунтом, если репозиторий приватный):
+   ```bash
+   docker compose pull app
+   docker compose up -d
+   ```
+   Не используйте на сервере **`docker compose up --build`**, если хотите брать только то, что уже в Hub (иначе снова пойдёт локальная сборка).
+
+После правок Java: снова **`build` + `push`**, на сервере — **`pull app`** и **`up -d`**.
+
+### Docker Compose: лимиты CPU/RAM и переменные окружения
+
+В **`docker-compose.yml`** для сервиса **`app`** задано:
+
+- **`deploy.resources.limits` / `reservations`** — верхняя граница и резерв CPU/RAM (поддерживается современным **`docker compose`**; при необходимости обновите Docker / Compose).
+- Значения по умолчанию можно переопределить через **`.env`** (шаблон — **`.env.example`**) или экспорт переменных перед `docker compose up`:
+  - **`APP_CPU_LIMIT`**, **`APP_MEMORY_LIMIT`**, **`APP_CPU_RESERVATION`**, **`APP_MEMORY_RESERVATION`**
+
+**Подключение к БД и Tomcat через env** (см. [внешнюю конфигурацию Spring Boot](https://docs.spring.io/spring-boot/reference/features/external-config.html)):
+
+| Переменная | Назначение |
+|------------|------------|
+| **`SPRING_DATASOURCE_URL`** | JDBC URL (в Docker по умолчанию `jdbc:postgresql://postgresdb:5432/lab2_db`) |
+| **`SPRING_DATASOURCE_USERNAME`**, **`SPRING_DATASOURCE_PASSWORD`** | Учётка БД |
+| **`POSTGRES_DB`**, **`POSTGRES_USER`**, **`POSTGRES_PASSWORD`** | Инициализация контейнера PostgreSQL; **имя БД в URL и в `POSTGRES_DB` должно совпадать** (для строки из таблицы, например **hl3**: и `POSTGRES_DB=hl3`, и `SPRING_DATASOURCE_URL=jdbc:postgresql://postgresdb:5432/hl3`) |
+| **`SERVER_TOMCAT_THREADS_MAX`** | Эквивалент свойства **`server.tomcat.threads.max`** (в старых версиях ТЗ фигурировало `server.tomcat.max-threads`) |
+| **`SPRING_JPA_SHOW_SQL`** | `true` / `false` — вывод SQL Hibernate в лог |
+| **`SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL`** | форматирование SQL в логе |
+| **`DOCKER_IMAGE_APP`** | Полное имя образа приложения на Hub, например **`логин/lab2_rovnyagin:latest`** |
+
+В **`application.properties`** заданы плейсхолдеры для **`spring.jpa.show-sql`**, **`hibernate.format_sql`** и **`server.tomcat.threads.max`**, чтобы локально без Docker можно было задавать те же переменные.
+
+В Docker по умолчанию **`SPRING_JPA_SHOW_SQL=false`** (тише логи контейнера).
+
+### SSH-туннель к приложению на сервере
+
+Если приложение в контейнере слушает **8080** на ВМ:
+
+```bash
+ssh -p <ВАШ_SSH_ПОРТ> -L 8080:localhost:8080 hl@hlssh.zil.digital
+```
+
+Дальше на своём ПК: **`http://localhost:8080/`**, **`http://localhost:8080/swagger-ui.html`**.
+
+### Swagger
+
+OpenAPI/Swagger уже подключены (**`/swagger-ui.html`**, **`/v3/api-docs`**). После деплоя проверьте в браузере или `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/v3/api-docs`.
+
+### Нагрузочное тестирование (лаб. 6, п. 10)
+
+Нужны **постоянные VU** и три соотношения **вставка/чтение** (POST создание фильма / GET аналитики): **5/95**, **50/50**, **95/5** — задаётся **`POST_SHARE`** (`0.05`, `0.5`, `0.95`).
+
+- Сценарий: **`k6/cinema-lab6-constant.js`**
+- Три прогона подряд: **`./k6/run-lab6-ratio-sweep.sh`** (результаты: **`k6/reports/lab6-summary-*.json`**)
+
+Переменные: **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`** (в БД должны быть билеты на этот фильм — Flyway **`V2`** или сидер лаб. 5).
+
+**Серия «время отклика vs число CPU»:** на ВМ меняйте **`APP_CPU_LIMIT`** (шаг **0.5** vCPU) в **`.env`**, перезапустите приложение: **`docker compose up -d --force-recreate app`** (если образ с Hub не менялся) или полный цикл **`pull` + `up`** после публикации нового образа; затем снова k6. Повторите для соотношений 5/95, 50/50, 95/5.
+
+По ТЗ прогоны нужны **с локальной машины на сервер** (часто `BASE_URL=http://localhost:8080` при открытом SSH-туннеле или прямой URL сервера) и **с сервера на сервер** (`BASE_URL=http://localhost:8080` при запуске k6 на той же ВМ).
+
+### Быстрый чеклист после правок кода
+
+**На машине разработчика** (сборка и публикация образа):
+
+```bash
+docker compose build app
+docker compose push app
+```
+
+**На сервере** (только подтягивание образа и перезапуск):
+
+```bash
+docker compose pull app
+docker compose up -d --force-recreate app
+```
+
+Локально без Hub по-прежнему можно собрать и запустить: **`docker compose build app && docker compose up -d`**.
+
+---
+
 ## Лабораторная работа №5: сидирование REST (Python + Faker)
 
 Цель: при необходимости перед нагрузочным прогоном **очистить** таблицы и **массово** заполнить API тестовыми данными через **HTTP** (базовый набор уже вносит Flyway **`V2`**).
@@ -588,7 +757,7 @@ python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements
 
 ### Типовая цепочка: стенд → сид → k6
 
-1. Поднять API с актуальным кодом (после изменений Java — **`docker compose up -d --build`**, иначе в контейнере может не быть `/api/admin/clear/*`).
+1. Поднять API с актуальным кодом (локально: **`docker compose up -d --build --force-recreate app`**; через Hub: **`build` + `push`**, на стенде **`pull app` + `up -d`**).
 2. **`./tools/run-seed.sh`** (или `COUNT=100 ENDPOINT=all ./tools/run-seed.sh`).
 3. **`./k6/run-sweep.sh`** (при необходимости задать **`FILM_ID`** на существующий фильм — см. `GET /api/films`).
 
@@ -599,6 +768,9 @@ python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements
 | `GET /api/films` → `[]` | После **`clear`** таблицы пустые — снова запустите сидер; либо проверьте, что смотрите ту же БД, что и приложение. |
 | `DELETE /api/admin/clear/...` → не **204** | Профиль **`inmemory`** не поддерживает clear; убедитесь, что образ **`app`** пересобран с классами `AdminMaintenance*`. |
 | Данные в pgAdmin есть, API пустой | Разные хост/БД/порт в настройках подключения; сравните с `application.properties` / `application-docker.properties`. |
+| `/swagger-ui.html` или `/v3/api-docs` → **500**, JSON с `"Unexpected server error"` | Часто **старый** образ или сбой SpringDoc; **`docker logs lab2_app`**. Пересоберите/подтяните образ и пересоздайте контейнер (**`pull app` + `up -d --force-recreate app`** или **`up -d --build --force-recreate app`** локально). |
+| Правили Java, в браузере всё по-старому | С Hub: **`push`** нового образа, на сервере **`pull app`** и **`up -d --force-recreate app`**. Локально: **`up -d --build --force-recreate app`**. |
+| `bootRun`: *Port 8080 was already in use* | На **8080** уже слушает **`lab2_app`**: `docker stop lab2_app` или локальный запуск с **`SERVER_PORT=8081`**. |
 
 **IntelliJ IDEA:** Run **`Lab2Application`** (профиль не **`inmemory`**, PostgreSQL доступна), затем в терминале IDE: **`./tools/run-seed.sh`** или Run-конфигурация для **`seed_rest_data.py`** с аргументами `--endpoint all --count 50`.
 
@@ -708,9 +880,13 @@ USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
 
 | Адрес | Сервис | Назначение |
 |-------|--------|------------|
-| `http://localhost:8080` | Spring Boot | Приложение (в т.ч. из контейнера `app` при полном `docker compose up`) |
+| `http://localhost:8080` | Spring Boot | Одно приложение: HTML (`/`, `/films/page`, …), REST (`/api/...`), Swagger (`/swagger-ui.html`), OpenAPI JSON (`/v3/api-docs`). Типично контейнер **`lab2_app`** или локальный `bootRun`. |
+| `http://localhost:8080/swagger-ui.html` | Swagger UI | Документация и вызовы REST (тот же порт, что и приложение). |
+| `http://localhost:8080/v3/api-docs` | OpenAPI | Машиночитаемая спецификация API. |
 | `http://localhost:15432` | pgAdmin 4 | Веб-интерфейс для визуального управления БД |
 | `localhost:5432` | PostgreSQL | База данных (используется приложением для подключения) |
+
+Порт приложения можно переопределить: **`SERVER_PORT=8081`** или **`--server.port=8081`** (тогда все URL выше — с **8081**).
 
 ### Учетные данные
 
