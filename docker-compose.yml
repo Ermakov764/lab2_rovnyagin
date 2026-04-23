@@ -4,15 +4,15 @@ services:
     container_name: lab2_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: lab2_password
-      POSTGRES_DB: lab2_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
+      POSTGRES_DB: ${POSTGRES_DB:-lab2_db}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,6 +31,8 @@ services:
         condition: service_healthy
 
   app:
+    # Образ с Docker Hub (на сервере: docker compose pull app). Сборка и push: см. README (лаб. 6).
+    image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -40,9 +42,23 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgresdb:5432/lab2_db}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
     depends_on:
       postgresdb:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU_LIMIT:-1.50}"
+          memory: ${APP_MEMORY_LIMIT:-1536M}
+        reservations:
+          cpus: "${APP_CPU_RESERVATION:-0.25}"
+          memory: ${APP_MEMORY_RESERVATION:-256M}
 
 volumes:
   postgres_data:
