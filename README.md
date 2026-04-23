@@ -1,6 +1,6 @@
-# Лабораторная работа №3–4: Cinema (Docker + Spring Boot + JPA + Flyway + k6)
+# Лабораторная работа №3–5: Cinema (Docker + Spring Boot + JPA + Flyway + k6)
 
-**№3:** контейнер приложения (`Dockerfile`), Flyway (DDL/DML), полный стек в Docker Compose (`postgresdb`, `app`, `pgadmin`). **№4:** нагрузочное тестирование [Grafana k6](https://k6.io/) — смешанная нагрузка POST/GET, серия прогонов с ростом VU, график средней задержки vs нагрузка. REST + HTML; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
+**№3:** контейнер приложения (`Dockerfile`), Flyway (**DDL + стартовый DML** в `V2`), полный стек в Docker Compose (`postgresdb`, `app`, `pgadmin`). **№4:** нагрузочное тестирование [Grafana k6](https://k6.io/) — смешанная нагрузка POST/GET, серия прогонов с ростом VU, график средней задержки vs нагрузка. **№5:** Python-скрипт (`requests` + Faker) и REST-эндпоинты очистки таблиц для **массового** сида перед k6. REST + HTML; по умолчанию `JPA/Flyway/PostgreSQL`, opt-in профиль `inmemory`.
 
 ## Эндпоинты
 
@@ -56,12 +56,24 @@
 | GET | `/api/tickets/analytics/max-viewers?filmId=...` | Найти день с максимальным числом уникальных зрителей для выбранного фильма. |
 | GET | `/api/tickets/analytics/top-film-by-day?date=YYYY-MM-DD` | Найти самый посещаемый фильм за указанную дату. |
 
+### REST API: администрирование (лаб. 5, только БД; профиль не `inmemory`)
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| DELETE | `/api/admin/clear/tickets` | Очистить таблицу `tickets` (`TRUNCATE … RESTART IDENTITY CASCADE`). |
+| DELETE | `/api/admin/clear/films` | Удалить билеты и фильмы. |
+| DELETE | `/api/admin/clear/viewers` | Удалить билеты и зрителей. |
+| DELETE | `/api/admin/clear/all` | Очистить `tickets`, `films`, `viewers`. |
+
+Ответы: **204 No Content**. В учебном стенде без авторизации; в реальном проекте такие операции нужно защищать.
+
 ## Требования
 
 - Java 25
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
 - **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
+- **Лаб. 5:** Python 3 + зависимости сидера: `pip install -r tools/requirements-seed.txt`
 
 ## Быстрый старт (лаб. 3: приложение и БД в Docker Compose)
 
@@ -95,7 +107,7 @@ docker compose down -v
 ### Default (без профиля)
 
 - Используется PostgreSQL (`spring.datasource.*` в `application.properties`, URL на `localhost` при запуске с хоста)
-- Включены Flyway миграции (`V1`, `V2`)
+- Включены Flyway-миграции **`V1`** (DDL) и **`V2`** (стартовые тестовые строки)
 - Hibernate работает в `ddl-auto=validate`
 
 ### `docker` (запуск приложения в контейнере)
@@ -158,11 +170,12 @@ docker compose down -v
 - `POST /viewers/page/create`
 - `POST /tickets/page/create`
 
-## Миграции и БД (требование лаб. 3: DDL + DML)
+## Миграции и БД (лаб. 3: DDL + DML в Flyway; лаб. 5: доп. сид через REST)
 
 - Каталог: `src/main/resources/db/migration`
   - `V1__create_schema.sql` — **DDL** (создание таблиц `viewers`, `films`, `tickets`, ключи и ограничения)
-  - `V2__seed_test_data.sql` — **DML** (начальные `INSERT` и `setval` последовательностей после явных `id`)
+  - `V2__seed_test_data.sql` — **DML** (небольшой набор `INSERT` и `setval` для последовательностей)
+- Для **большого** объёма данных перед k6 можно дополнительно использовать `tools/seed_rest_data.py` (см. **лаб. 5**): он вызывает `DELETE /api/admin/clear/...` и создаёт сущности через REST.
 - Flyway применяет скрипты при старте приложения (в контейнере или при `./gradlew bootRun`).
 - Таблицы домена: `films`, `viewers`, `tickets`.
 
@@ -292,7 +305,7 @@ docker compose down
 - Связи One-to-Many / Many-to-One -> `Film 1:N Ticket` и `Viewer 1:N Ticket` через `@OneToMany` и `@ManyToOne`.
 - Репозитории Spring Data -> отдельные `FilmRepository`, `ViewerRepository`, `TicketRepository` (на базе `JpaRepository`).
 - Кастомный JPQL-запрос -> аналитический запрос в `TicketRepository` для поиска дня с максимальным числом зрителей по фильму.
-- Инициализация схемы и тестовых данных -> Flyway-миграции (`V1__create_schema.sql`, `V2__seed_test_data.sql`) применяются при старте.
+- Инициализация схемы и базовых тестовых данных -> Flyway-миграции `V1__create_schema.sql` и `V2__seed_test_data.sql` применяются при старте; при необходимости — доп. сид **лаб. 5** (`tools/seed_rest_data.py`).
 - PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose), в контейнере приложения — профиль `docker` и `application-docker.properties`.
 - Контейнеризация (лаб. 3) -> `Dockerfile` (multi-stage, Java 25), сервис `app` в `docker-compose.yml`.
 Ссылка на шаблон (ветка `feature/spring-boot-data-jpa`): https://bitbucket.org/zil-courses/hl-module1/src/feature/spring-boot-data-jpa/
@@ -302,11 +315,11 @@ docker compose down
 - Создание сущностей с аннотациями JPA
 - Репозитории для работы с БД
 - Создание схемы БД через Flyway-миграции
-- Наполнение БД тестовыми данными через Flyway-миграции
+- Наполнение БД тестовыми данными через Flyway (`V2`) и при необходимости через Python-скрипт (лаб. 5)
 - Визуальное управление через pgAdmin
   #### Техническая часть
  - Инфраструктура (Docker): PostgreSQL, pgAdmin и приложение в одном `docker-compose.yml`; образ приложения собирается из `Dockerfile`.
- -  ORM-маппинг (JPA): Hibernate работает в режиме валидации схемы (`ddl-auto=validate`), а создание структуры и сидирование выполняет Flyway.
+ -  ORM-маппинг (JPA): Hibernate работает в режиме валидации схемы (`ddl-auto=validate`), а создание структуры и базовый сид выполняет Flyway; массовое сидирование — опционально скрипт **лаб. 5**.
  -  Типизация данных: Корректное маппинг Java-типов (LocalDate, LocalTime, Double) на типы данных PostgreSQL (DATE, TIME, DOUBLE PRECISION).
  -  Аналитика (JPQL): Реализация кастомного запроса в репозитории для группировки и поиска дня с максимальной посещаемостью конкретного фильма.
   #### Бизнес-логика (Домен «Кинотеатр»)
@@ -319,7 +332,7 @@ docker compose down
 -  One-to-Many: Один фильм может иметь много билетов.
 -  One-to-Many: Один зритель может купить много билетов.
 - Целостность данных: Настройка каскадных операций (cascade = ALL) и автоудаления сирот (orphanRemoval = true) — билет удаляется автоматически при удалении зрителя или фильма.
-- Инициализация (Data Seeding): Автоматическое наполнение базы тестовыми сеансами и зрителями через Flyway-миграции (`V2__seed_test_data.sql`).
+- Инициализация (Data Seeding): базовый набор через Flyway `V2__seed_test_data.sql`; расширенное — через `tools/seed_rest_data.py` после `DELETE /api/admin/clear/...`.
 - Управление: Возможность просмотра и редактирования данных через веб-интерфейс pgAdmin.
 ---
 
@@ -358,6 +371,7 @@ lab2_rovnyagin/
 │   ├── application-docker.properties # URL БД для контейнера (postgresdb)
 │   └── db/migration/               # Flyway: V1 DDL, V2 DML
 ├── docker-compose.yml # postgresdb + app + pgadmin
+├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
 ├── k6/                 # Лаб. 4: k6 (cinema-mixed.js, run-sweep.sh, plot_avg_vs_vus.py)
 └── README.md                       # Этот файл
 ```
@@ -366,7 +380,9 @@ lab2_rovnyagin/
 
 При первом запуске Flyway применяет SQL-миграции из `src/main/resources/db/migration`:
 - `V1__create_schema.sql` — создание структуры БД;
-- `V2__seed_test_data.sql` — тестовые данные.
+- `V2__seed_test_data.sql` — небольшой набор тестовых строк.
+
+Дополнительно большой объём данных перед k6 можно создать скриптом `tools/seed_rest_data.py` (лаб. 5).
 
 Таблицы создаются Flyway (SQL-скриптами), а не Hibernate. Hibernate работает в режиме валидации схемы (`spring.jpa.hibernate.ddl-auto=validate`).
 
@@ -541,6 +557,51 @@ SET price = 600.0
 WHERE film_id = 1 AND session_date = '2026-04-25';
 ```
 
+## Лабораторная работа №5: сидирование REST (Python + Faker)
+
+Цель: при необходимости перед нагрузочным прогоном **очистить** таблицы и **массово** заполнить API тестовыми данными через **HTTP** (базовый набор уже вносит Flyway **`V2`**).
+
+### Скрипт
+
+| Файл | Назначение |
+|------|------------|
+| `tools/seed_rest_data.py` | `argparse`: `--base-url` (по умолчанию `http://localhost:8080`), `--count` (по умолчанию **500**), `--endpoint` **`films` \| `viewers` \| `tickets` \| `all`**. Сначала вызывает соответствующий `DELETE /api/admin/clear/...`, затем серию `POST` на `/api/films`, `/api/viewers`, `/api/tickets`. |
+| `tools/run-seed.sh` | Обёртка в духе `k6/run-sweep.sh`: при необходимости ставит зависимости из `requirements-seed.txt`; без аргументов — `BASE_URL` / `ENDPOINT` / `COUNT` из окружения (дефолты как у Python); с аргументами — проксирует их в `seed_rest_data.py`. |
+| `tools/requirements-seed.txt` | `requests`, `faker` |
+
+Установка зависимостей:
+
+```bash
+pip install -r tools/requirements-seed.txt
+```
+
+Примеры:
+
+```bash
+# то же через shell (по умолчанию all, count 500, BASE_URL из окружения)
+./tools/run-seed.sh
+
+ENDPOINT=films COUNT=100 ./tools/run-seed.sh
+
+# только фильмы (связанные билеты очищаются на стороне сервера)
+python3 tools/seed_rest_data.py --endpoint films --count 500
+
+# фильмы + зрители + билеты (по count записей каждого типа)
+python3 tools/seed_rest_data.py --endpoint all --count 200
+
+python3 tools/seed_rest_data.py --endpoint tickets --count 300 --base-url http://localhost:8080
+
+./tools/run-seed.sh --endpoint all --count 50 --base-url http://localhost:8080
+```
+
+Для `--endpoint tickets` в БД уже должны быть фильмы и зрители (или сначала выполните `--endpoint all` / отдельно `films` и `viewers`).
+
+После `--endpoint all` или `--endpoint films` первый созданный фильм обычно имеет **`id = 1`** (после полной очистки), что удобно для **`FILM_ID=1`** в k6. Без скрипта после чистого Flyway **`V2`** тоже создаёт фильм с **`id = 1`**.
+
+**Профиль `inmemory`:** эндпоинты `/api/admin/clear/*` **не** поднимаются; сидер рассчитан на работу с PostgreSQL.
+
+---
+
 ## Лабораторная работа №4: нагрузочное тестирование (k6)
 
 Цель: смоделировать нагрузку на API с **растущим числом виртуальных пользователей (VU)** и построить **график среднего времени отклика** (`http_req_duration.avg`, мс) **от целевых VU**.
@@ -566,7 +627,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 ### Подготовка
 
-1. Запустите API (например `docker compose up -d` или `./gradlew bootRun`), убедитесь, что доступен **`http://localhost:8080`** и в БД есть фильм с id **`1`** (Flyway `V2`), либо задайте **`FILM_ID`**.
+1. Запустите API (например `docker compose up -d` или `./gradlew bootRun`), убедитесь, что доступен **`http://localhost:8080`**. После применения Flyway **`V2`** для аналитики обычно подходит **`FILM_ID=1`**. Для большой выборки перед k6 можно выполнить **`python3 tools/seed_rest_data.py --endpoint all --count …`**. Иначе задайте **`FILM_ID`** на существующий фильм.
 
 2. Установите k6 **или** используйте Docker (см. ниже).
 

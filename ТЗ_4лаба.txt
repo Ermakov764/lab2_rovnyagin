@@ -1,4 +1,0 @@
-LAB3
-Написать Dockerfile для контейнеризации приложения
-В src/main/resources/db/migration прописать инициализацию схемы (DDL) и начальных данных (DML - inserts) приложения
-Развернуть приложение и DB в docker compose

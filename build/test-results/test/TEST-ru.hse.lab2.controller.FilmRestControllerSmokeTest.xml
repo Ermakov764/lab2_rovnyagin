@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ru.hse.lab2.controller.FilmRestControllerSmokeTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-14T10:15:34.882Z" hostname="ermakov" time="1.02">
+<testsuite name="ru.hse.lab2.controller.FilmRestControllerSmokeTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-23T00:16:05.708Z" hostname="ermakov" time="1.163">
   <properties/>
-  <testcase name="getAll_returnsOkAndFilmPayload()" classname="ru.hse.lab2.controller.FilmRestControllerSmokeTest" time="1.02"/>
-  <system-out><![CDATA[13:15:35.792 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
-13:15:35.793 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
-13:15:35.795 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+  <testcase name="getAll_returnsOkAndFilmPayload()" classname="ru.hse.lab2.controller.FilmRestControllerSmokeTest" time="1.163"/>
+  <system-out><![CDATA[03:16:06.730 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+03:16:06.732 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+03:16:06.734 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 2 ms
 ]]></system-out>
   <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
 WARNING: A Java agent has been loaded dynamically (/home/serafim/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.8/f09415827a71be7ed621c7bd02550678f28bc81c/byte-buddy-agent-1.17.8.jar)
