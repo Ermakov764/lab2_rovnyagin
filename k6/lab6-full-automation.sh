@@ -3,7 +3,8 @@
 #   для каждого APP_CPU_LIMIT → правка .env → пересоздание app → удалённый k6 (три смеси) →
 #   копирование results с k6-ВМ → PNG в ./png_k6/
 #
-# Требования на этой ВМ: docker compose, curl, python3 + matplotlib, ssh-ключ на k6 (порт 2311).
+# Требования на этой ВМ: docker compose, curl, rsync, python3 + matplotlib, ssh-ключ на k6 (порт 2311).
+# На k6-ВМ ~/ermakov_k6/k6/ полностью синхронизируется с репозиторием (кроме удалённого k6/reports/).
 #
 # Пример:
 #   cd ~/lab2_rovnyagin
