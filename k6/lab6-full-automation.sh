@@ -46,7 +46,7 @@ docker compose version >/dev/null 2>&1 || fail "Нет docker compose"
 command -v curl >/dev/null 2>&1 || fail "Нет curl"
 command -v scp >/dev/null 2>&1 || fail "Нет scp"
 command -v python3 >/dev/null 2>&1 || fail "Нет python3"
-python3 -c 'import matplotlib' 2>/dev/null || fail "Нужен matplotlib: sudo apt install python3-matplotlib  или  python3 -m pip install --user \"matplotlib>=3.7\""'
+python3 -c 'import matplotlib' 2>/dev/null || fail "Нужен matplotlib: sudo apt install python3-matplotlib или python3 -m pip install --user matplotlib"
 
 SSH_TEST=(ssh -p "${K6_SSH_PORT}" -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE}")
 "${SSH_TEST[@]}" true 2>/dev/null || fail "SSH к ${REMOTE} порт ${K6_SSH_PORT} не удался. Выполните: ssh-copy-id -i ~/.ssh/id_ed25519.pub -p ${K6_SSH_PORT} ${REMOTE}"
