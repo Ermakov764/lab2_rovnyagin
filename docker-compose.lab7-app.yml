@@ -1,0 +1,33 @@
+# Лаб. 7 (ТЗ): только приложение; БД на другом хосте (DBHOST, по ТЗ — hl12.zil).
+# Поднимайте после узла БД, когда сеть до DBHOST:DBPORT открыта.
+# Пример: docker compose -f docker-compose.lab7-app.yml --env-file .env up -d
+
+services:
+  app:
+    image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lab2_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PUBLISH_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DBHOST: ${DBHOST:-hl12.zil}
+      DBPORT: ${DBPORT:-5432}
+      DBNAME: ${DBNAME:-lab2_db}
+      SCHEMANAME: ${SCHEMANAME:-public}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU_LIMIT:-1.50}"
+          memory: ${APP_MEMORY_LIMIT:-1536M}
+        reservations:
+          cpus: "${APP_CPU_RESERVATION:-0.25}"
+          memory: ${APP_MEMORY_RESERVATION:-256M}

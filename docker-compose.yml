@@ -3,6 +3,8 @@ services:
     image: postgres:15-alpine
     container_name: lab2_postgres
     restart: unless-stopped
+    # Лаб. 7 (ТЗ): лимит соединений в контейнере PostgreSQL
+    command: ["postgres", "-c", "max_connections=1000"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
@@ -42,7 +44,11 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgresdb:5432/lab2_db}
+      DBHOST: ${DBHOST:-postgresdb}
+      DBPORT: ${DBPORT:-5432}
+      # Если DBNAME не задан — как имя БД в postgres-сервисе (POSTGRES_DB)
+      DBNAME: ${DBNAME:-${POSTGRES_DB:-lab2_db}}
+      SCHEMANAME: ${SCHEMANAME:-public}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}

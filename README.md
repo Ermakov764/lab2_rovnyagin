@@ -448,6 +448,8 @@ lab2_rovnyagin/
 │   ├── application-docker.properties # URL БД для контейнера (postgresdb)
 │   └── db/migration/               # Flyway: V1 DDL, V2 DML
 ├── docker-compose.yml # postgresdb + app + pgadmin; лаб. 6: limits, env для JDBC/Tomcat/JPA
+├── docker-compose.lab7-db.yml   # Лаб. 7: только Postgres + pgAdmin (узел БД, max_connections=1000)
+├── docker-compose.lab7-app.yml  # Лаб. 7: только app (DBHOST по умолчанию hl12.zil)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
 ├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
 ├── k6/                 # Лаб. 4/6: cinema-mixed.js, cinema-lab6-constant.js, run-sweep.sh, run-lab6-ratio-sweep.sh
@@ -720,7 +722,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
    cd lab2_rovnyagin
    git checkout <нужная_ветка>   # например lab_4_plus_lab5
    cp .env.example .env
-   nano .env   # DOCKER_IMAGE_APP; POSTGRES_DB и SPRING_DATASOURCE_URL — одно имя БД (часто hl3)
+   nano .env   # DOCKER_IMAGE_APP; POSTGRES_DB и DBNAME — одно имя БД (часто hl3); SCHEMANAME при необходимости
    ```
 4. Чистый старт БД и подъём стека:
    ```bash
@@ -775,7 +777,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | Что | Пример | Зачем |
 |-----|--------|--------|
 | SSH к персональной ВМ | `ssh -p 2303 hl@hlssh.zil.digital` | не искать порт в переписке |
-| Имя БД в `.env` | `hl3` или `lab2_db` | **`POSTGRES_DB`** = суффикс в **`SPRING_DATASOURCE_URL`** |
+| Имя БД в `.env` | `hl3` или `lab2_db` | **`POSTGRES_DB`** = **`DBNAME`** (и при необходимости **`SCHEMANAME`**) |
 | Образ приложения | `логин/lab2_rovnyagin:latest` | **`DOCKER_IMAGE_APP`** |
 | IP приложения для k6 с другой ВМ | из таблицы курса | **`BASE_URL`**, иначе k6 бьёт не туда |
 
@@ -1122,6 +1124,33 @@ docker compose up -d --force-recreate app
 ```
 
 Локально без Hub по-прежнему можно собрать и запустить: **`docker compose build app && docker compose up -d`**.
+
+---
+
+## Лабораторная работа №7: PostgreSQL на отдельном узле (hl12.zil)
+
+Текст задания: **`ТЗ_7лаба.txt`**. Идея: контейнер **PostgreSQL** и **pgAdmin** поднимаются на узле БД (**по ТЗ — `hl12.zil`**), приложение — на другой машине (например персональной ВМ курса) и подключается по сети. В **`application.properties`** URL задаётся через **`DBHOST`**, **`DBPORT`**, **`DBNAME`**, **`SCHEMANAME`** (как в примере из ТЗ с подстановкой из таблицы курса).
+
+### Файлы
+
+| Файл | Назначение |
+|------|------------|
+| **`docker-compose.lab7-db.yml`** | Только **postgres** (**`max_connections=1000`**) и **pgAdmin**. Том **`lab7_postgres_data`**. Публикация порта: **`POSTGRES_PUBLISH_PORT`** (по умолчанию **5432**). |
+| **`docker-compose.lab7-app.yml`** | Только **`app`**; **`DBHOST`** по умолчанию **`hl12.zil`**, **`DBPORT`** — **5432**. Без **`depends_on`** к локальному Postgres. |
+
+Полный стек «всё на одной ВМ» по-прежнему: **`docker-compose.yml`** (удобно для лаб. 6 и отладки).
+
+### Порядок развёртывания
+
+1. **На узле БД** (`hl12.zil`): скопировать репозиторий или только compose + **`.env`**, задать **`POSTGRES_*`**, имя БД из [таблицы курса](https://docs.google.com/spreadsheets/d/1CoubOXgx3PPpACLwhk_1lJ7QfoCFjmLf9jEzhSnu0qM/edit?gid=0#gid=0) (для примера в этом репозитории встречается **`hl3`**), при необходимости **`POSTGRES_PUBLISH_PORT`**.  
+   `docker compose -f docker-compose.lab7-db.yml --env-file .env up -d`  
+2. Убедиться, что **с ВМ приложения** доступны **`DBHOST:DBPORT`** (фаервол, маршрутизация в **`10.60.3.0/24`** и т. п. — по методичке курса).  
+3. **На ВМ приложения**: в **`.env`** выставить **`DBHOST=hl12.zil`**, **`DBPORT`** (если Postgres слушает не стандартный порт на хосте), **`DBNAME`** и **`SCHEMANAME`** так же, как в ТЗ/таблице (часто одно значение, например **`hl3`**), те же **`SPRING_DATASOURCE_*`**, что и на узле БД.  
+   `docker compose -f docker-compose.lab7-app.yml --env-file .env pull app` (или **`build`**)  
+   `docker compose -f docker-compose.lab7-app.yml --env-file .env up -d`  
+4. Проверка: **`curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/`** на ВМ приложения; при ошибках — **`docker compose -f docker-compose.lab7-app.yml logs app`**.
+
+**pgAdmin** на узле БД: в браузере **`http://<IP_hl12>:15432`** (или **`PGADMIN_PUBLISH_PORT`**), регистрация сервера: хост **`postgresdb`** или **`127.0.0.1`** / имя сервиса в зависимости от того, подключаетесь ли из контейнера pgAdmin (в этом compose сеть общая — хост **`postgresdb`**, порт **5432**).
 
 ---
 

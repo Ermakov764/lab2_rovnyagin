@@ -1,0 +1,4 @@
+LAB7
+
+Переносим БД на отдельный узел (hl12.zil) и запускаем в контейнере. Запуск осуществить в docker compose (контейнер с БД и контейнер с pgAdmin в команде запуска postgres переопределить количество соединений command: postgres -c max_connections=1000). 
+Каждое приложение должно использовать сервер hl12.zil в качестве основного соединения с БД в application.properties и названим БД из таблицы https://docs.google.com/spreadsheets/d/1CoubOXgx3PPpACLwhk_1lJ7QfoCFjmLf9jEzhSnu0qM/edit?gid=0#gid=0  (spring.datasource.url=jdbc:postgresql://${DBHOST:localhost}:${DBPORT:5432}/${DBNAME:hl5}?currentSchema=${SCHEMANAME:hl5})
