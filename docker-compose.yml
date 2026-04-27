@@ -33,11 +33,8 @@ services:
         condition: service_healthy
 
   app:
-    # Образ с Docker Hub (на сервере: docker compose pull app). Сборка и push: см. README (лаб. 6).
+    # Только образ из реестра (Docker Hub после docker login). Сборка: docker build -t "$DOCKER_IMAGE_APP" .
     image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: lab2_app
     restart: unless-stopped
     ports:

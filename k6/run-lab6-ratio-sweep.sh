@@ -6,6 +6,9 @@
 # (старые файлы в этой папке удаляются). Метки каталогов: 0.5, 1.0, 1.5, 2
 # Примеры: RESULT_CPU=1.5  или  RESULT_CPU=2
 #
+# Опционально LAB6_AUTO_PLOT=1 — после прогона вызвать k6/plot_lab6_from_results.py
+# (нужен matplotlib; на ВМ должен лежать plot_lab6_from_results.py в k6/).
+#
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -71,6 +74,20 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
   fi
   cp -v "${copies[@]}" "$dest/"
   echo "Скопировано в ${dest}/ (папка перед копированием очищена от старых lab6-summary-*.json)."
+
+  if [[ "${LAB6_AUTO_PLOT:-0}" == "1" ]]; then
+    plot_py="${ROOT}/k6/plot_lab6_from_results.py"
+    if [[ ! -f "$plot_py" ]]; then
+      echo "LAB6_AUTO_PLOT=1: нет $plot_py — положите скрипт или отключите LAB6_AUTO_PLOT." >&2
+      exit 1
+    fi
+    mkdir -p "${ROOT}/png_k6"
+    echo "LAB6_AUTO_PLOT: python3 $plot_py ${ROOT}/results -o ${ROOT}/png_k6"
+    python3 "$plot_py" "${ROOT}/results" -o "${ROOT}/png_k6"
+  fi
 else
   echo "Подсказка: задайте RESULT_CPU=0.5|1.0|1.5|2 — тогда JSON продублируются в results/cpu-<метка>/."
+  if [[ "${LAB6_AUTO_PLOT:-0}" == "1" ]]; then
+    echo "Подсказка: LAB6_AUTO_PLOT имеет смысл вместе с RESULT_CPU (иначе свежие JSON только в k6/reports)." >&2
+  fi
 fi

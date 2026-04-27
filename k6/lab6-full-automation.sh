@@ -108,8 +108,8 @@ scp -P "${K6_SSH_PORT}" -r "${REMOTE}:${K6_REMOTE_DIR}/results/"* "${LOCAL_PULL}
 
 echo "=== PNG в ${PNG_DIR} ==="
 mkdir -p "$PNG_DIR"
-rm -f "${PNG_DIR}"/lab6-cpu-*.png 2>/dev/null || true
+rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png "${PNG_DIR}"/lab6-cpu-*.png 2>/dev/null || true
 python3 "${ROOT}/k6/plot_lab6_from_results.py" "$LOCAL_PULL" -o "$PNG_DIR"
 
 echo ""
-echo "Готово. Актуальные графики: ${PNG_DIR}/lab6-cpu-*.png"
+echo "Готово. Актуальные графики (ТЗ п.10): ${PNG_DIR}/lab6-vs-cpu-mix-*.png"

@@ -4,10 +4,8 @@
 
 services:
   app:
+    # Только образ из реестра (Docker Hub). На ВМ: docker login && docker compose pull app
     image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: lab2_app
     restart: unless-stopped
     ports:
