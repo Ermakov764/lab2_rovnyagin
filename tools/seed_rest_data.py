@@ -8,6 +8,8 @@ LAB5: сидирование и точечная очистка Cinema REST (req
   python3 tools/seed_rest_data.py --endpoint tickets --count 100 --divisor 10
     → создаёт max(1, 100//10)=10 фильмов и 10 зрителей, затем 100 билетов (только clear/tickets перед этим).
   python3 tools/seed_rest_data.py --endpoint all --count 200
+  python3 tools/seed_rest_data.py --endpoint all --count 500 --even
+    → то же, но билеты: round-robin по фильмам и зрителям (равномерная нагрузка на аналитику).
 
 Только очистка (без --count):
   python3 tools/seed_rest_data.py --endpoint films --clear    # билеты + фильмы
@@ -125,9 +127,13 @@ def _film_viewer_ids(session: requests.Session, base: str) -> tuple[List[int], L
     return f_ids, v_ids
 
 
-def _seed_tickets_only(session: requests.Session, base: str, count: int) -> None:
+def _seed_tickets_only(
+    session: requests.Session, base: str, count: int, *, even: bool = False
+) -> None:
     # Получаем id всех фильмов и зрителей (для назначения билетов)
     f_ids, v_ids = _film_viewer_ids(session, base)
+    f_ids = sorted(f_ids)
+    v_ids = sorted(v_ids)
     # Если список фильмов или зрителей пуст — сообщаем об ошибке и завершаем работу
     if not f_ids or not v_ids:
         die("Нет фильмов или зрителей для билетов.")
@@ -135,11 +141,16 @@ def _seed_tickets_only(session: requests.Session, base: str, count: int) -> None
     url = f"{base}/api/tickets"
     # Запоминаем сегодняшнюю дату как базовую для генерации дат сессий
     base_d = date.today()
+    nf, nv = len(f_ids), len(v_ids)
     # Генерируем необходимое количество билетов
     for i in range(count):
-        # Случайным образом выбираем фильм и зрителя
-        film_id = random.choice(f_ids)
-        viewer_id = random.choice(v_ids)
+        if even:
+            # Равномерно: каждый следующий билет — следующая пара (фильм, зритель) по кругу
+            film_id = f_ids[i % nf]
+            viewer_id = v_ids[i % nv]
+        else:
+            film_id = random.choice(f_ids)
+            viewer_id = random.choice(v_ids)
         # Вычисляем дату (циклически +0...19 дней к текущей дате)
         d = base_d + timedelta(days=(i % 20))
         # Вычисляем время: часы 10...17, минуты меняются по формуле, секунды — 0
@@ -181,7 +192,9 @@ def seed_viewers(session: requests.Session, base: str, count: int) -> None:
     _seed_viewers_only(session, base, count)
 
 
-def seed_tickets(session: requests.Session, base: str, count: int, divisor: int) -> None:
+def seed_tickets(
+    session: requests.Session, base: str, count: int, divisor: int, *, even: bool
+) -> None:
     if divisor < 1:
         die("--divisor must be >= 1")
     per_side = max(1, count // divisor)
@@ -189,17 +202,17 @@ def seed_tickets(session: requests.Session, base: str, count: int, divisor: int)
     req_clear(session, base, "tickets")
     _seed_films_only(session, base, per_side)
     _seed_viewers_only(session, base, per_side)
-    _seed_tickets_only(session, base, count)
+    _seed_tickets_only(session, base, count, even=even)
 
 
-def seed_all(session: requests.Session, base: str, count: int) -> None:
+def seed_all(session: requests.Session, base: str, count: int, *, even: bool) -> None:
     req_clear(session, base, "all")
     print("  создаю films...")
     _seed_films_only(session, base, count)
     print("  создаю viewers...")
     _seed_viewers_only(session, base, count)
     print("  создаю tickets...")
-    _seed_tickets_only(session, base, count)
+    _seed_tickets_only(session, base, count, even=even)
 
 
 def main() -> None:
@@ -228,6 +241,11 @@ def main() -> None:
         default=10,
         help="Для --endpoint tickets: число фильмов и зрителей = max(1, count // divisor)",
     )
+    p.add_argument(
+        "--even",
+        action="store_true",
+        help="Билеты: round-robin по всем фильмам и зрителям (равномерно; иначе — random)",
+    )
     args = p.parse_args()
     base = args.base_url.rstrip("/")
     session = requests.Session()
@@ -247,9 +265,9 @@ def main() -> None:
     elif args.endpoint == "viewers":
         seed_viewers(session, base, n)
     elif args.endpoint == "tickets":
-        seed_tickets(session, base, n, args.divisor)
+        seed_tickets(session, base, n, args.divisor, even=args.even)
     else:
-        seed_all(session, base, n)
+        seed_all(session, base, n, even=args.even)
     print("Готово.")
 
 

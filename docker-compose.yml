@@ -54,14 +54,12 @@ services:
     depends_on:
       postgresdb:
         condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "${APP_CPU_LIMIT:-1.50}"
-          memory: ${APP_MEMORY_LIMIT:-1536M}
-        reservations:
-          cpus: "${APP_CPU_RESERVATION:-0.25}"
-          memory: ${APP_MEMORY_RESERVATION:-256M}
+    # Лимиты для обычного `docker compose up`: cpus/mem_limit → HostConfig (NanoCpus, Memory).
+    # Секция deploy.resources на части установок не применялась — из-за этого серия APP_CPU_LIMIT
+    # давала почти одинаковую нагрузку и «ломаные» графики. Не дублируйте deploy.limits.cpus
+    # и `cpus` — Compose запрещает два разных значения.
+    cpus: "${APP_CPU_LIMIT:-1.50}"
+    mem_limit: "${APP_MEMORY_LIMIT:-1536m}"
 
 volumes:
   postgres_data:

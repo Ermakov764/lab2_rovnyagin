@@ -102,15 +102,27 @@ for cpu in ${LAB6_CPUS}; do
 done
 
 echo ""
-echo "=== Забираем ~/ermakov_k6/results с k6-ВМ ==="
+echo "=== Забираем ~/ermakov_k6/results и k6/reports-lab6-s2s с k6-ВМ ==="
 rm -rf "$LOCAL_PULL"
 mkdir -p "$LOCAL_PULL"
-scp -P "${K6_SSH_PORT}" -r "${REMOTE}:${K6_REMOTE_DIR}/results/"* "${LOCAL_PULL}/"
+scp -P "${K6_SSH_PORT}" -r "${REMOTE}:${K6_REMOTE_DIR}/results/"* "${LOCAL_PULL}/" || true
+rm -rf "${ROOT}/k6/reports-lab6-s2s"
+scp -P "${K6_SSH_PORT}" -r "${REMOTE}:${K6_REMOTE_DIR}/k6/reports-lab6-s2s" "${ROOT}/k6/" || true
 
 echo "=== PNG в ${PNG_DIR} ==="
 mkdir -p "$PNG_DIR"
-rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png 2>/dev/null || true
+rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png "${PNG_DIR}"/lab6_latency_vs_cpu*.png 2>/dev/null || true
 python3 "${ROOT}/k6/plot_lab6_from_results.py" "$LOCAL_PULL" -o "$PNG_DIR" --vus "${TARGET_VUS}"
+if [[ -d "${ROOT}/k6/reports-lab6-s2s" ]]; then
+  shopt -s nullglob
+  _lab6_json=( "${ROOT}/k6/reports-lab6-s2s/"*_cpu*_mix*.json )
+  shopt -u nullglob
+  if [[ ${#_lab6_json[@]} -ge 1 ]]; then
+    python3 "${ROOT}/k6/plot_k6_reports.py" --lab6 "${ROOT}/k6/reports-lab6-s2s" && \
+      cp -f "${ROOT}/k6/reports-lab6-s2s/lab6_latency_vs_cpu.png" "${PNG_DIR}/lab6_latency_vs_cpu-s2s.png"
+    echo "Панельный график (как zil/k6): ${PNG_DIR}/lab6_latency_vs_cpu-s2s.png (если все 12 JSON на месте)"
+  fi
+fi
 
 echo ""
-echo "Готово. Актуальные графики (3 шт.): ${PNG_DIR}/lab6-vs-cpu-mix-*.png"
+echo "Готово. Legacy (3 PNG): ${PNG_DIR}/lab6-vs-cpu-mix-*.png; при полной серии в reports-lab6-s2s — ещё lab6_latency_vs_cpu-s2s.png"

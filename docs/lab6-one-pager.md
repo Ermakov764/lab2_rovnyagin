@@ -107,7 +107,7 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 | Файл | Роль |
 |------|------|
 | `scripts/ssh-tunnel-personal-vm.sh` | Туннель 8080 с ПК на ВМ |
-| `k6/cinema-lab6-constant.js` | constant VU, POST/GET |
+| `k6/cinema-lab6-constant.js` | постоянные VU; в итерации POST с вероятностью POST_SHARE (как zil LAB6) |
 | `k6/run-lab6-ratio-sweep.sh` | 5/95, 50/50, 95/5 подряд |
 | `k6/plot_lab6_from_results.py` | PNG из `results/cpu-*` |
 | `k6/remote-k6-sync-and-run.sh` | rsync k6 + запуск на удалённой k6-ВМ |
@@ -116,4 +116,4 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 
 ## Соответствие ТЗ (ультракратко)
 
-1–3 ВМ, ключи, git, `docker login` — вручную. 4 `docker-compose.yml`. 5 туннель. 6 Swagger. 7 `deploy.resources`. 8 env JDBC + Tomcat. 9 `SPRING_JPA_SHOW_SQL`. 10 k6 + графики + два сценария доступа.
+1–3 ВМ, ключи, git, `docker login` — вручную. 4 `docker-compose.yml`. 5 туннель. 6 Swagger. 7 `cpus`/`mem_limit` + `APP_CPU_LIMIT`. 8 env JDBC + Tomcat. 9 `SPRING_JPA_SHOW_SQL`. 10 k6 + графики + два сценария доступа.

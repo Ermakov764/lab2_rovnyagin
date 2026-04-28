@@ -36,8 +36,10 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-METRIC_POST = "k6_post_film_ms"
-METRIC_GET = "k6_get_analytics_ms"
+METRIC_POST = "post_ms"
+METRIC_GET = "get_ms"
+METRIC_POST_LEGACY = "k6_post_film_ms"
+METRIC_GET_LEGACY = "k6_get_analytics_ms"
 
 MIX_SPECS: List[Tuple[re.Pattern, str, str]] = [
     (re.compile(r"post05-get95"), "5% POST / 95% GET (5/95)", "mix-5-95"),
@@ -63,6 +65,13 @@ def extract_avg_from_trend(trend: dict) -> Optional[float]:
 
 def extract_metric(summary: dict, name: str) -> Optional[float]:
     return extract_avg_from_trend((summary.get("metrics") or {}).get(name) or {})
+
+
+def extract_post_get_avg(summary: dict) -> tuple[Optional[float], Optional[float]]:
+    m = summary.get("metrics") or {}
+    p = extract_metric(summary, METRIC_POST) or extract_metric(summary, METRIC_POST_LEGACY)
+    g = extract_metric(summary, METRIC_GET) or extract_metric(summary, METRIC_GET_LEGACY)
+    return p, g
 
 
 def cpu_float_from_dir(dirname: str) -> Optional[float]:
@@ -213,8 +222,7 @@ def collect_series_for_mix(
         sig = meta_core_tuple(meta)
         meta_signatures.add(sig)
 
-        p = extract_metric(data, METRIC_POST)
-        g = extract_metric(data, METRIC_GET)
+        p, g = extract_post_get_avg(data)
         vus = extract_vus_from_stem(path.stem)
         if vus is None:
             issues.append(f"{path.name}: в имени файла нет суффикса -vus-<число>")
@@ -227,7 +235,7 @@ def collect_series_for_mix(
 
         if p is None or g is None:
             issues.append(
-                f"{path.name}: нет метрик {METRIC_POST} / {METRIC_GET} (post={p} get={g})"
+                f"{path.name}: нет метрик post_ms/get_ms или k6_* (post={p} get={g})"
             )
             continue
         rows.append((cpu_v, p, g, vus, meta))

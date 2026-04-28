@@ -455,7 +455,7 @@ lab2_rovnyagin/
 ├── docker-compose.lab7-app.yml  # Лаб. 7: только app (DBHOST по умолчанию hl12.zil)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
 ├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
-├── k6/                 # Лаб. 4/6: cinema-mixed.js, cinema-lab6-constant.js, run-sweep.sh, run-lab6-ratio-sweep.sh
+├── k6/                 # Лаб. 4/6: cinema-*.js, run-sweep.sh, run-lab6-ratio-sweep.sh, plot_k6_reports.py, reports-lab6-pc|s2s/
 ├── scripts/            # Лаб. 6: ssh-tunnel-personal-vm.sh
 └── README.md                       # Этот файл
 ```
@@ -486,10 +486,10 @@ lab2_rovnyagin/
 
 | | |
 |---|---|
-| **Зачем** | Три прогона подряд с **постоянными** VU и разными долями POST/GET (**5/95, 50/50, 95/5**) по сценарию **`k6/cinema-lab6-constant.js`**. |
+| **Зачем** | Три прогона подряд с **постоянными** VU и смесью POST/GET (**5/95, 50/50, 95/5**) по сценарию **`k6/cinema-lab6-constant.js`** (как zil **`LAB6_CONST`**: в каждой итерации случайно POST или GET с вероятностью **`POST_SHARE`**). |
 | **Где** | Из **корня репозитория**; вызывает **`k6 run`** локально (**k6** должен быть в **`PATH`**). |
-| **Переменные** | **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`** (`pc-to-server` с ПК через туннель или **`server-to-server`** с k6-ВМ — попадает в **`lab6_meta`** JSON и в подпись PNG). Если задан **`RESULT_CPU`** (0.5, 1.0, 1.5 или 2), после прогона JSON копируются в **`results/cpu-<метка>/`** (папка перед копированием очищается от старых **`lab6-summary-*.json`**). |
-| **Результат** | **`k6/reports/lab6-summary-post05-get95-…json`** и аналогично для 50/50 и 95/5; при **`RESULT_CPU`** — дубликаты в **`results/cpu-*`**. |
+| **Переменные** | **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`**: **`pc-to-server`** → JSON в **`k6/reports-lab6-pc/`** (префикс **`pc_`**), **`server-to-server`** → **`k6/reports-lab6-s2s/`** (**`s2s_`**). Имена как в типовом zil/k6: **`pc_cpu10_mix50.json`** (**cpu05|10|15|20** = 0.5…2 vCPU, **mix05|50|95** = смеси). Если задан **`RESULT_CPU`**, копии с алиасами имён — в **`results/cpu-*`** для **`plot_lab6_from_results.py`**. **`LAB6_AUTO_PLOT_PANELS=1`** — попытка вызвать **`plot_k6_reports.py`** (нужны уже все 12 JSON в папке). |
+| **Результат** | Без **`RESULT_CPU`**: черновик **`k6/reports/lab6-summary-*.json`**. С **`RESULT_CPU`**: три файла в **`reports-lab6-pc`** или **`reports-lab6-s2s`** + три **`lab6-summary-*`** в **`results/cpu-*`**. |
 | **Создаёт каталоги** | **`results/cpu-0.5`** … **`cpu-2`** для удобства дальнейшей укладки отчётов. |
 
 ### `k6/remote-k6-sync-and-run.sh` (лаб. 6)
@@ -500,7 +500,7 @@ lab2_rovnyagin/
 | **Где запускать** | С **ПК** или **персональной ВМ**, откуда есть **`rsync`**, **`ssh`**, **`curl`** и настроен **безпарольный SSH** на k6-хост (**`ssh-copy-id -p $K6_SSH_PORT …`**). |
 | **Обязательные env** | **`K6_SSH_HOST`**, **`BASE_URL`** (URL приложения **с точки зрения k6-ВМ**, например внутренний IP), **`RESULT_CPU`**. Обычно также **`K6_SSH_PORT`** (пример **2311**), **`K6_REMOTE_DIR`** (каталог на удалёнке, напр. **`~/ermakov_k6`**). |
 | **Проверки перед стартом** | **`curl`** к **`BASE_URL/`** с машины, где запускаете скрипт (часто ПК), и предупреждение по **`GET .../analytics/max-viewers?filmId=`**; наличие **`k6`** на удалённой стороне. Если ПК не в сети приложения, а k6-ВМ — в ней: **`LAB6_SKIP_LOCAL_APP_CHECK=1`** (проверку с ПК отключает; **`BASE_URL`** всё равно должен открываться **с k6-ВМ**). |
-| **Особенность rsync** | Локальный **`k6/reports/`** не затирает удалённый **`reports/`** (на удалёнке копятся/остаются JSON текущих прогонов по замыслу скрипта). |
+| **Особенность rsync** | Локальные **`k6/reports/`**, **`reports-lab6-pc/`**, **`reports-lab6-s2s/`** не затирают одноимённые каталоги на удалённой k6-ВМ (на удалёнке копятся JSON прогонов). |
 
 ### `k6/lab6-full-automation.sh` (лаб. 6, «всё в одном»)
 
@@ -524,7 +524,8 @@ lab2_rovnyagin/
 | Файл | Роль |
 |------|------|
 | **`k6/plot_avg_vs_vus.py`** | Строит график по отчётам лаб. 4 (**`summary-vus-*.json`**). Вызывается из **`run-sweep.sh`**. |
-| **`k6/plot_lab6_from_results.py`** | Строит **три** PNG по п. 10 ТЗ: **один файл на смесь** 5/95, 50/50, 95/5 — на каждом графике **X** = лимит CPU, **Y** = среднее POST/GET (**`lab6-vs-cpu-mix-*.png`**). В заголовок выводятся **`TARGET_VUS`**, **`DURATION`**, **`BASE_URL`**, сценарий (**ПК → сервер** / **сервер → сервер**) из **`lab6_meta`** в JSON. Если в одной папке **`cpu-*`** лежат и **`*-vus-30.json`**, и **`*-vus-400.json`**, укажите **`--vus 400`** (или **`--vus 30`**), иначе скрипт завершится с ошибкой. Без **`lab6_meta`** или при смеси разного **`lab6_meta`** между папками — ошибка. Переменная **`LAB6_PLOT_VUS`** в **`scripts/lab6-sync-png-from-k6-vm.sh`** пробрасывается как **`--vus`**. |
+| **`k6/plot_k6_reports.py`** | **Лаб. 6, вид как zil/k6:** один PNG **`lab6_latency_vs_cpu.png`** — **три панели** (смеси 5/95, 50/50, 95/5), ось **X** = CPU. Вход: все **`pc_cpu05_mix05.json` … `s2s_cpu20_mix95.json`** в **`k6/reports-lab6-pc/`** или **`reports-lab6-s2s/`**. Команда: **`python3 k6/plot_k6_reports.py --lab6 k6/reports-lab6-pc`**. Метрики **`post_ms` / `get_ms`** (старые JSON с **`k6_*`** тоже читаются). |
+| **`k6/plot_lab6_from_results.py`** | Строит **три отдельных** PNG (**`lab6-vs-cpu-mix-*.png`**) из **`results/cpu-*`**. Условия те же (**`lab6_meta`**, **`--vus`** при смешанных прогонах). |
 | **`tools/seed_rest_data.py`** | Реализация сидирования; вызывается из **`run-seed.sh`**. |
 
 ## Структура базы данных
@@ -892,16 +893,16 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | **4** | Развернуть в Docker Compose | **`docker-compose.yml`**: `postgresdb`, `app`, `pgadmin`. |
 | **5** | SSH `-L 8080:localhost:8080` | Скрипт **`scripts/ssh-tunnel-personal-vm.sh`** и команда в разделе «SSH-туннель». |
 | **6** | Проверка приложения, Swagger | **`OpenApiConfig`**, SpringDoc: **`/swagger-ui.html`**, **`/v3/api-docs`**. |
-| **7** | Явно CPU/RAM контейнера приложения | У сервиса **`app`**: **`deploy.resources.limits` / `reservations`** (`APP_CPU_LIMIT`, …). |
+| **7** | Явно CPU/RAM контейнера приложения | У сервиса **`app`**: **`cpus`** и **`mem_limit`** из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`** (лимиты без Swarm; см. **`docker inspect`** ниже). |
 | **8** | БД и потоки Tomcat через **переменные окружения** (`server.tomcat.max-threads` в ТЗ) | В Compose: **`SPRING_DATASOURCE_*`**, **`SERVER_TOMCAT_THREADS_MAX`** → свойство **`server.tomcat.threads.max`** (актуальный аналог `max-threads`). См. [Spring: внешняя конфигурация](https://docs.spring.io/spring-boot/reference/features/external-config.html), [Baeldung: env → properties](https://www.baeldung.com/spring-boot-properties-env-variables). |
 | **9** | Отключение `spring.jpa.show-sql` через переменную | **`SPRING_JPA_SHOW_SQL`** в Compose и плейсхолдер в **`application.properties`**. |
 | **10** | График: время отклика vs CPU (шаг **0.5**), **const VU**, смеси **5/95, 50/50, 95/5**; опыты **с ПК на сервер** и **с сервера на сервер** | **`k6/cinema-lab6-constant.js`**, **`k6/run-lab6-ratio-sweep.sh`**, папки **`results/cpu-*`**, **`k6/plot_lab6_from_results.py`** → PNG. Порядок «приложение + k6-ВМ + ПК» — **«Полный порядок: hl03 + k6-ВМ + ПК»**; сценарии k6 — **«П. 10 ТЗ: два сценария прогона»**. |
 
 ### Как в коде и скриптах выполнена лабораторная 6
 
-- **Контейнеризация и конфигурация:** в **`docker-compose.yml`** у сервиса **`app`** заданы лимиты **CPU/RAM** (`deploy.resources`), все чувствительные параметры приложения и БД пробрасываются через **`.env`** / **`environment`** (JDBC, Tomcat, JPA, образ Hub).
+- **Контейнеризация и конфигурация:** в **`docker-compose.yml`** у сервиса **`app`** заданы лимиты **CPU/RAM** (**`cpus`**, **`mem_limit`** — так они гарантированно применяются при **`docker compose up`**), все чувствительные параметры приложения и БД пробрасываются через **`.env`** / **`environment`** (JDBC, Tomcat, JPA, образ Hub).
 - **Доступ с ПК к приложению на ВМ:** отдельный скрипт **`scripts/ssh-tunnel-personal-vm.sh`** повторяет требование ТЗ **`ssh -L 8080:localhost:8080`** (с учётом нестандартного SSH-порта курса).
-- **Нагрузка по ТЗ п. 10:** сценарий **`k6/cinema-lab6-constant.js`** держит **постоянное число VU** и делит их между **POST** (вставка) и **GET** (чтение аналитики); **`k6/run-lab6-ratio-sweep.sh`** три раза подряд гоняет смеси **5/95, 50/50, 95/5**. Меняя **`APP_CPU_LIMIT`** и перезапуская **`app`**, вы снимаете ряд точек «время отклика vs выделенный CPU»; **`k6/plot_lab6_from_results.py`** собирает **PNG** для отчёта.
+- **Нагрузка по ТЗ п. 10:** **`k6/cinema-lab6-constant.js`** — **фиксированное число VU** и **`duration`**; в каждой итерации с вероятностью **`POST_SHARE`** выполняется **POST** `/api/films`, иначе **GET** аналитики (та же идея, что **`load.js`** одногруппницы с **`LAB6_CONST=1`**). **`k6/run-lab6-ratio-sweep.sh`** три раза подряд меняет **`POST_SHARE`** (5/95, 50/50, 95/5). Дальше — **`plot_k6_reports.py --lab6`** или **`plot_lab6_from_results.py`** по **`results/cpu-*`**.
 - **С ПК без ручного копирования JSON:** **`scripts/lab6-sync-png-from-k6-vm.sh`** подтягивает **`results/cpu-*`** с k6-ВМ, при необходимости дописывает **`lab6_meta`**, строит **`png_k6/*.png`** (**`LAB6_PLOT_VUS`** = **`--vus`**).
 - **Автоматизация полного цикла лаб. 6 (опционально):** **`k6/lab6-full-automation.sh`** на персональной ВМ меняет CPU в **`.env`**, пересоздаёт контейнер приложения, синхронизирует k6 на общую ВМ и забирает результаты; **`k6/remote-k6-sync-and-run.sh`** — только выгрузка каталога **`k6/`** и запуск прогона по SSH на машине с установленным **k6**.
 
@@ -910,7 +911,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | Файл | Назначение |
 |------|------------|
 | **`scripts/ssh-tunnel-personal-vm.sh`** | Запуск на **ПК**: SSH с **`-L 8080:localhost:8080`** к персональной ВМ (по умолчанию порт SSH **2303**). Пока скрипт/сессия живы, браузер на ПК открывает приложение по **`http://localhost:8080`**. |
-| **`k6/cinema-lab6-constant.js`** | Сценарий k6: **constant VU**, **`POST_SHARE`**, **`POST /api/films`**, **`GET /api/tickets/analytics/max-viewers`**, метрики **`k6_post_film_ms`** / **`k6_get_analytics_ms`**. |
+| **`k6/cinema-lab6-constant.js`** | Лаб. 6: **`vus` + `duration`**, в итерации **`Math.random() < POST_SHARE`** → POST, иначе GET; метрики **`post_ms`** / **`get_ms`**. |
 | **`k6/run-lab6-ratio-sweep.sh`** | Три прогона подряд с **`POST_SHARE`** 0.05 / 0.5 / 0.95; пишет **`k6/reports/lab6-summary-*.json`**; опционально **`RESULT_CPU`** копирует отчёты в **`results/cpu-*`**. |
 | **`k6/plot_lab6_from_results.py`** | По папкам **`results/cpu-*`** строит графики (среднее POST/GET vs смесь) — **PNG** для отчёта. Нужен **matplotlib**. Флаг **`--vus`**: выбор файлов **`*-vus-N.json`** при смешанных прогонах. |
 | **`k6/inject-lab6-meta-into-results.py`** | Дописывает **`lab6_meta`** в JSON без метаданных (имя файла + **`--base-url`**, **`--k6-route`**, …). Вызывается из **`lab6-sync-png-from-k6-vm.sh`** при **`BASE_URL`**. |
@@ -967,7 +968,6 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 |------------|--------|
 | **`APP_CPU_LIMIT`** | Лимит CPU (число или дробь, напр. `0.5`, `1.5`, `2`). Меняете **шагом 0.5** для серии экспериментов. |
 | **`APP_MEMORY_LIMIT`** | Потолок RAM (например `1536M`). |
-| **`APP_CPU_RESERVATION`**, **`APP_MEMORY_RESERVATION`** | Гарантированный минимум планировщику контейнеров. |
 
 **Переменные только для запуска k6 (не в Compose)**
 
@@ -1050,7 +1050,7 @@ docker compose up -d
 - Либо вывод на ПК: **`curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/swagger-ui.html`** (часто **302** — нормально).
 
 **4. Пункт 7 (лимиты CPU/RAM)**  
-- Фрагмент **`docker-compose.yml`** с блоком **`deploy.resources`** у **`app`**.  
+- Фрагмент **`docker-compose.yml`** у **`app`**: ключи **`cpus`** и **`mem_limit`** (подставляются из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`**).  
 - Дополнительно на ВМ (показывает фактические лимиты у контейнера):
   ```bash
   docker inspect lab2_app --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
@@ -1071,7 +1071,7 @@ docker compose up -d
 - В тексте отчёта **явно разделите два эксперимента**:  
   - **«ПК → сервер»:** k6 запускался на ПК, **`BASE_URL=http://127.0.0.1:8080`**, SSH-туннель к ВМ.  
   - **«Сервер → сервер»:** k6 запускался на указанной машине (ВМ приложения или общая k6-ВМ), **`BASE_URL`** — URL, **доступный с этой машины** (например внутренний IP приложения).  
-- По желанию: вставить в отчёт фрагмент **`k6/cinema-lab6-constant.js`** с **`constant-vus`** и пояснить **`POST_SHARE`** 0.05 / 0.5 / 0.95.
+- По желанию: фрагмент **`k6/cinema-lab6-constant.js`** (`export default`, **`POST_SHARE`**, **`post_ms`/`get_ms`**).
 
 **7. Если просят «показать на паре»**  
 На ВМ: **`docker compose ps`**, **`curl localhost:8080`**. На ПК: поднять туннель, открыть Swagger. При необходимости один короткий прогон k6 с **`TARGET_VUS=5`** и **`DURATION=30s`**, чтобы не ждать минуты.
@@ -1106,9 +1106,9 @@ docker compose up -d
 
 В **`docker-compose.yml`** для сервиса **`app`** задано:
 
-- **`deploy.resources.limits` / `reservations`** — верхняя граница и резерв CPU/RAM (поддерживается современным **`docker compose`**; при необходимости обновите Docker / Compose).
-- Значения по умолчанию можно переопределить через **`.env`** (шаблон — **`.env.example`**) или экспорт переменных перед `docker compose up`:
-  - **`APP_CPU_LIMIT`**, **`APP_MEMORY_LIMIT`**, **`APP_CPU_RESERVATION`**, **`APP_MEMORY_RESERVATION`**
+- **`cpus`** и **`mem_limit`** — жёсткие лимиты для обычного **`docker compose up`** (без Swarm). Раньше использовалась секция **`deploy.resources`**; на части установок она **не доходила** до контейнера, из‑за чего серия **`APP_CPU_LIMIT`** не меняла реальную квоту CPU и графики лаб. 6 выглядели «ломано» по сравнению с одногруппниками.
+- Переопределение через **`.env`** (шаблон — **`.env.example`**) или экспорт перед `docker compose up`:
+  - **`APP_CPU_LIMIT`**, **`APP_MEMORY_LIMIT`**
 
 **Подключение к БД и Tomcat через env** (п. 8 ТЗ; см. [внешнюю конфигурацию Spring Boot](https://docs.spring.io/spring-boot/reference/features/external-config.html) и [переменные окружения → свойства](https://www.baeldung.com/spring-boot-properties-env-variables)):
 
@@ -1148,7 +1148,7 @@ OpenAPI/Swagger уже подключены (**`/swagger-ui.html`**, **`/v3/api-
 
 ### Нагрузочное тестирование (лаб. 6, п. 10)
 
-Нужны **постоянные VU** (`executor: constant-vus`) и три соотношения **вставка/чтение** по методичке (секция «Дополнительно»): **POST** создание сущности / **GET** аналитики — в сценарии это **`POST /api/films`** и **`GET /api/tickets/analytics/max-viewers`**. Смеси **5/95**, **50/50**, **95/5** задаются **`POST_SHARE`**: **`0.05`**, **`0.5`**, **`0.95`**.
+Нужны **постоянные VU** (короткая форма **`vus` + `duration`** в k6) и три соотношения **вставка/чтение**: **`POST /api/films`** и **`GET /api/tickets/analytics/max-viewers`**. Смеси **5/95**, **50/50**, **95/5** — три прогона с **`POST_SHARE`**: **`0.05`**, **`0.5`**, **`0.95`** (вероятность POST в итерации).
 
 - Сценарий: **`k6/cinema-lab6-constant.js`**
 - Три прогона подряд: **`./k6/run-lab6-ratio-sweep.sh`** (результаты: **`k6/reports/lab6-summary-*.json`**)
@@ -1413,7 +1413,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 
 | Файл | Назначение |
 |------|------------|
-| `tools/seed_rest_data.py` | `--base-url`, `--endpoint` **`films` \| `viewers` \| `tickets` \| `all`**, `--count` (по умолчанию **500**; при **`--clear`** не нужен). **`--clear`** — только очистка: `films` → clear/films; `viewers` → clear/viewers; `tickets` → те же билеты+зрители (`clear/viewers`); `all` → clear/all. Сидирование: `films`/`viewers` — как раньше; **`tickets`** — `clear/tickets`, затем **`max(1, count // divisor)`** фильмов и столько же зрителей (`--divisor`, по умолчанию **10**), затем **`count`** билетов; **`all`** — по **`count`** каждого типа. |
+| `tools/seed_rest_data.py` | `--base-url`, `--endpoint` **`films` \| `viewers` \| `tickets` \| `all`**, `--count` (по умолчанию **500**; при **`--clear`** не нужен). **`--even`** — билеты в **`tickets`** / **`all`**: round-robin по всем фильмам и зрителям (равномерно; по умолчанию билеты — **random**). **`--clear`** — только очистка: `films` → clear/films; `viewers` → clear/viewers; `tickets` → те же билеты+зрители (`clear/viewers`); `all` → clear/all. Сидирование: `films`/`viewers` — как раньше; **`tickets`** — `clear/tickets`, затем **`max(1, count // divisor)`** фильмов и столько же зрителей (`--divisor`, по умолчанию **10**), затем **`count`** билетов; **`all`** — по **`count`** каждого типа. |
 | `tools/run-seed.sh` | Обёртка в духе `k6/run-sweep.sh`. Если нет `requests`/`faker`, создаёт **`tools/.venv`** и ставит зависимости туда (удобно при **PEP 668** / запрете системного `pip`). Без аргументов — `BASE_URL` / `ENDPOINT` / `COUNT` из окружения; с аргументами — проксирует в `seed_rest_data.py`. Переменная **`NO_PIP_INSTALL=1`** — не трогать venv/pip. |
 | `tools/requirements-seed.txt` | `requests`, `faker` |
 
@@ -1457,6 +1457,8 @@ python3 tools/seed_rest_data.py --endpoint films --count 500
 
 # фильмы + зрители + билеты (по count записей каждого типа)
 python3 tools/seed_rest_data.py --endpoint all --count 200
+# то же, но билеты распределены равномерно по каждому фильму и зрителю (round-robin)
+python3 tools/seed_rest_data.py --endpoint all --count 2000 --even
 
 python3 tools/seed_rest_data.py --endpoint tickets --count 100 --divisor 10
 python3 tools/seed_rest_data.py --endpoint viewers --clear
@@ -1484,7 +1486,7 @@ python3 tools/seed_rest_data.py --endpoint tickets --clear
 | Создание «простой» сущности (без ссылок на другие сущности в теле запроса) | `POST` | `/api/films` | JSON: `title`, `genre`, `durationMinutes` |
 | Статистика (агрегация по билетам/фильму) | `GET` | `/api/tickets/analytics/max-viewers?filmId=…` | Аналитика; для сида обычно `filmId=1` |
 
-Доля нагрузки **POST / GET** задаётся **`POST_SHARE`** в `[0..1]`: **`TARGET_VUS`** делится между двумя параллельными сценариями k6 (пул только POST и пул только GET), без случайного выбора внутри одной итерации.
+**Лаб. 4 (`cinema-mixed.js`):** доля **VU** между двумя сценариями **`ramping-vus`** — **`POST_SHARE`** от **`TARGET_VUS`**. **Лаб. 6 (`cinema-lab6-constant.js`):** все **VU** в одном потоке; в каждой итерации с вероятностью **`POST_SHARE`** — POST, иначе GET (как типовой zil **`LAB6_CONST`**).
 
 ### Скрипты (коммитятся в репозиторий)
 
@@ -1492,7 +1494,7 @@ python3 tools/seed_rest_data.py --endpoint tickets --clear
 |------|----------|
 | `k6/cinema-mixed.js` | Два параллельных сценария **`ramping-vus`**: **`post_films`** (POST `/api/films`) и **`get_analytics`** (GET аналитики); доля VU между ними — **`POST_SHARE`** от **`TARGET_VUS`**, пакет **`k6/http`**. |
 | `k6/run-sweep.sh` | Серия прогонов **10 → 20 → 40 → 80 → 160**; перед стартом **очищает** `k6/reports` (JSON/PNG); после прогонов при необходимости ставит **`matplotlib`** и строит **`avg_vs_vus.png`**. Опции: **`NO_CLEAN=1`**, **`NO_PLOT=1`**, **`USE_DOCKER_K6=1`**. |
-| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`**: две линии **POST** и **GET** по метрикам `k6_post_film_ms` / `k6_get_analytics_ms` из `cinema-mixed.js`; для старых JSON без них — одна линия по `http_req_duration`. |
+| `k6/plot_avg_vs_vus.py` | Читает `summary-vus-*.json`, строит **`k6/reports/avg_vs_vus.png`**: две линии по **`post_ms` / `get_ms`** (или legacy **`k6_*`**); без них — одна линия по `http_req_duration`. |
 
 Сгенерированные **`*.json` / `*.png`** в `k6/reports/` по умолчанию в **`.gitignore`** (в коммит кладутся сами сценарии и генератор графика).
 
@@ -1543,7 +1545,7 @@ USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
 ### Критерии соответствия ТЗ (кратко)
 
 - Используются **`ramping-vus`** и **`k6/http`**.
-- Нагрузка: **POST** создание простой сущности + **GET** статистики; **два параллельных пула** VU, пропорция **`POST_SHARE`** от **`TARGET_VUS`**.
+- Нагрузка лаб. 6: **POST** + **GET**; **`POST_SHARE`** — вероятность POST в итерации (**лаб. 4** по-прежнему — два пула **`ramping-vus`**).
 - Несколько уровней нагрузки (**4–5 точек**, удвоение VU) и **график avg vs VU** через `plot_avg_vs_vus.py`.
 
 ## Локальные адреса и порты

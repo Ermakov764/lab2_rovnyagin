@@ -3,8 +3,8 @@ import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 
 /** Попадают в summary-export отдельно — для графика POST vs GET в plot_avg_vs_vus.py */
-const postFilmMs = new Trend('k6_post_film_ms');
-const getAnalyticsMs = new Trend('k6_get_analytics_ms');
+const postFilmMs = new Trend('post_ms');
+const getAnalyticsMs = new Trend('get_ms');
 
 /**
  * LAB4: смешанная нагрузка — два параллельных пула VU:

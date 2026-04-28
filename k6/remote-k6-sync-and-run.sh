@@ -108,10 +108,12 @@ fi
 
 echo "==> rsync ${ROOT}/k6/ -> ${REMOTE}:${K6_REMOTE_DIR}/k6/"
 echo "    (исключено: локальный k6/reports — удалённый k6/reports/ не перезаписывается и не удаляется)"
-"${SSH[@]}" "mkdir -p ${K6_REMOTE_DIR}/k6/reports"
-# С удалённой стороны не трогаем каталог reports (там актуальные JSON текущего прогона).
+"${SSH[@]}" "mkdir -p ${K6_REMOTE_DIR}/k6/reports ${K6_REMOTE_DIR}/k6/reports-lab6-pc ${K6_REMOTE_DIR}/k6/reports-lab6-s2s"
+# С удалённой стороны не трогаем каталоги с отчётами (там актуальные JSON прогонов).
 rsync -avz -e "ssh -p ${K6_SSH_PORT} -o BatchMode=yes" \
   --exclude='reports/' \
+  --exclude='reports-lab6-pc/' \
+  --exclude='reports-lab6-s2s/' \
   --exclude='__pycache__/' \
   --exclude='*.pyc' \
   "${ROOT}/k6/" "${REMOTE}:${K6_REMOTE_DIR}/k6/"
@@ -132,4 +134,4 @@ export RESULT_CPU='${RESULT_CPU}'
 ./k6/run-lab6-ratio-sweep.sh
 EOF
 
-echo "Готово. JSON: ${K6_REMOTE_DIR}/k6/reports/ и копия в ${K6_REMOTE_DIR}/results/cpu-<метка>/ на k6-машине."
+echo "Готово. JSON: ${K6_REMOTE_DIR}/k6/reports-lab6-*/ (zil-стиль) и копия в ${K6_REMOTE_DIR}/results/cpu-<метка>/ на k6-машине."

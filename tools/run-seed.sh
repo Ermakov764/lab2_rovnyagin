@@ -5,6 +5,7 @@
 #   BASE_URL   по умолчанию http://localhost:8080
 #   ENDPOINT   по умолчанию all  (films | viewers | tickets | all)
 #   COUNT      по умолчанию 500
+#   EVEN=1     — добавить --even (равномерные билеты при ENDPOINT=all|tickets)
 #
 # С аргументами — всё передаётся в Python как есть (нужен --endpoint):
 #   ./tools/run-seed.sh --endpoint films --count 100
@@ -64,10 +65,15 @@ if [[ "$#" -eq 0 ]]; then
       --clear
   fi
   COUNT="${COUNT:-500}"
+  even_args=()
+  if [[ "${EVEN:-0}" == "1" ]]; then
+    even_args+=(--even)
+  fi
   exec "${PYBIN}" "${SCRIPT_DIR}/seed_rest_data.py" \
     --base-url "${BASE_URL}" \
     --endpoint "${ENDPOINT}" \
-    --count "${COUNT}"
+    --count "${COUNT}" \
+    "${even_args[@]}"
 fi
 
 exec "${PYBIN}" "${SCRIPT_DIR}/seed_rest_data.py" "$@"

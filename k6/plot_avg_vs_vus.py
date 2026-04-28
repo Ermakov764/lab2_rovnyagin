@@ -2,8 +2,8 @@
 """
 LAB4: график среднего времени отклика (мс) vs TARGET_VU по summary-vus-*.json.
 
-Если в JSON есть кастомные метрики k6 (Trend) из cinema-mixed.js:
-  k6_post_film_ms, k6_get_analytics_ms — строятся две линии с подписями (легенда).
+Если в JSON есть Trend из cinema-mixed.js:
+  post_ms / get_ms (или старые k6_post_film_ms / k6_get_analytics_ms) — две линии.
 Иначе — одна линия по общему http_req_duration (старые отчёты).
 
 Зависимость: pip install "matplotlib>=3.7"
@@ -18,8 +18,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 # Имена Trend-метрик в k6/cinema-mixed.js (должны совпадать)
-METRIC_POST = "k6_post_film_ms"
-METRIC_GET = "k6_get_analytics_ms"
+METRIC_POST = "post_ms"
+METRIC_GET = "get_ms"
+METRIC_POST_LEGACY = "k6_post_film_ms"
+METRIC_GET_LEGACY = "k6_get_analytics_ms"
 METRIC_ALL = "http_req_duration"
 
 
@@ -61,8 +63,8 @@ def collect_series(
         with path.open(encoding="utf-8") as f:
             data = json.load(f)
 
-        p = extract_metric(data, METRIC_POST)
-        g = extract_metric(data, METRIC_GET)
+        p = extract_metric(data, METRIC_POST) or extract_metric(data, METRIC_POST_LEGACY)
+        g = extract_metric(data, METRIC_GET) or extract_metric(data, METRIC_GET_LEGACY)
         if p is not None:
             post_pts.append((vus, p))
         if g is not None:

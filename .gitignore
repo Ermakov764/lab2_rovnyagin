@@ -15,8 +15,11 @@ out/
 # Локальные секреты / параметры Compose (лаб. 6)
 .env
 
-# Python (лаб. 5)
+# Python (лаб. 5 / локальный venv в корне)
+.venv/
 tools/.venv/
+__pycache__/
+*.py[cod]
 tools/__pycache__/
 
 # k6 отчёты

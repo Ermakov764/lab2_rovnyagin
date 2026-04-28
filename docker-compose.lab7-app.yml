@@ -23,11 +23,6 @@ services:
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
-    deploy:
-      resources:
-        limits:
-          cpus: "${APP_CPU_LIMIT:-1.50}"
-          memory: ${APP_MEMORY_LIMIT:-1536M}
-        reservations:
-          cpus: "${APP_CPU_RESERVATION:-0.25}"
-          memory: ${APP_MEMORY_RESERVATION:-256M}
+    # См. docker-compose.yml у сервиса app — те же причины (лимиты без Swarm).
+    cpus: "${APP_CPU_LIMIT:-1.50}"
+    mem_limit: "${APP_MEMORY_LIMIT:-1536m}"
