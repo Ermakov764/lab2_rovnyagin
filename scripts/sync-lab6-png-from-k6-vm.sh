@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# С ПК: удаляет локальные графики лаб.6 в png_k6 и копирует свежие lab6-vs-cpu-*.png с k6-ВМ.
+# С ПК: удаляет локальные графики лаб.6 и копирует lab6-vs-cpu-*.png с k6-ВМ.
 #
 # Переменные окружения (опционально):
 #   K6_SSH_HOST       — по умолчанию hlssh.zil.digital
@@ -22,15 +22,16 @@ K6_SSH_PORT="${K6_SSH_PORT:-2311}"
 K6_REMOTE_SUBDIR="${K6_REMOTE_SUBDIR:-ermakov_k6}"
 
 mkdir -p "$PNG_DIR"
-echo "Очистка ${PNG_DIR}/lab6-vs-cpu-*.png (и устаревших lab6-cpu-*.png) ..."
-rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png "${PNG_DIR}"/lab6-cpu-*.png
+echo "Очистка ${PNG_DIR}/lab6-vs-cpu-*.png ..."
+rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png
 
-REMOTE_SPEC="${K6_SSH_USER}@${K6_SSH_HOST}:~/${K6_REMOTE_SUBDIR}/png_k6/lab6-vs-cpu-*.png"
-echo "Копирование с ${REMOTE_SPEC} (порт ${K6_SSH_PORT}) ..."
-scp -P "${K6_SSH_PORT}" "${REMOTE_SPEC}" "${PNG_DIR}/"
-
+REMOTE="${K6_SSH_USER}@${K6_SSH_HOST}:~/${K6_REMOTE_SUBDIR}/png_k6"
+echo "Копирование с ${REMOTE}/lab6-vs-cpu-*.png (порт ${K6_SSH_PORT}) ..."
+set +e
+scp -P "${K6_SSH_PORT}" "${REMOTE}/lab6-vs-cpu-*.png" "${PNG_DIR}/"
+set -e
 echo "Готово:"
-ls -la "${PNG_DIR}"/lab6-vs-cpu-*.png 2>/dev/null || {
-  echo "Нет файлов lab6-vs-cpu-*.png — на ВМ сначала plot_lab6_from_results.py или проверьте путь." >&2
+if ! ls -la "${PNG_DIR}"/lab6-vs-cpu-*.png 2>/dev/null; then
+  echo "Нет файлов lab6-vs-cpu-*.png — на ВМ сначала plot или проверьте путь." >&2
   exit 1
-}
+fi

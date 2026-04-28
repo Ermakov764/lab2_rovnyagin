@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# С ПК: по SSH на k6-ВМ запускает sweep + LAB6_AUTO_PLOT, затем подтягивает PNG в ./png_k6
-# (старые lab6-vs-cpu-*.png локально удаляются в sync-скрипте).
+# С ПК: по SSH на k6-ВМ запускает sweep (без plot на ВМ), затем подтягивает results/
+# и строит PNG локально — тот же pipeline, что ./scripts/lab6-sync-png-from-k6-vm.sh.
 #
-# Обязательно задайте BASE_URL — URL приложения с точки зрения k6-ВМ (IP hl03 и т. п.).
+# Обязательно задайте BASE_URL — URL приложения с точки зрения k6-ВМ.
 #
 # Пример:
-#   export BASE_URL=http://192.168.1.242:8080
+#   export BASE_URL=http://10.60.3.33:8080
 #   export RESULT_CPU=2
 #   ./scripts/lab6-remote-k6-plot-and-sync-png.sh
 #
@@ -23,8 +23,9 @@ RESULT_CPU="${RESULT_CPU:?Задайте RESULT_CPU: 0.5 | 1.0 | 1.5 | 2}"
 TARGET_VUS="${TARGET_VUS:-30}"
 DURATION="${DURATION:-90s}"
 FILM_ID="${FILM_ID:-1}"
+K6_ROUTE="${K6_ROUTE:-server-to-server}"
 
-echo "SSH ${K6_SSH_USER}@${K6_SSH_HOST}:${K6_SSH_PORT} → ~/${K6_REMOTE_SUBDIR} (k6 + plot) ..."
+echo "SSH ${K6_SSH_USER}@${K6_SSH_HOST}:${K6_SSH_PORT} → ~/${K6_REMOTE_SUBDIR} (только k6 sweep, без plot на ВМ) ..."
 ssh -p "${K6_SSH_PORT}" "${K6_SSH_USER}@${K6_SSH_HOST}" bash -s <<EOF
 set -euo pipefail
 cd "\${HOME}/${K6_REMOTE_SUBDIR}"
@@ -32,10 +33,17 @@ export BASE_URL="${BASE_URL}"
 export TARGET_VUS="${TARGET_VUS}"
 export DURATION="${DURATION}"
 export FILM_ID="${FILM_ID}"
+export K6_ROUTE="${K6_ROUTE}"
 export RESULT_CPU="${RESULT_CPU}"
-export LAB6_AUTO_PLOT=1
 ./k6/run-lab6-ratio-sweep.sh
 EOF
 
 echo ""
-"${ROOT}/scripts/sync-lab6-png-from-k6-vm.sh"
+export BASE_URL DURATION K6_ROUTE FILM_ID
+export LAB6_META_BASE_URL="${BASE_URL}"
+export LAB6_META_DURATION="${DURATION}"
+export LAB6_META_K6_ROUTE="${K6_ROUTE}"
+export LAB6_META_FILM_ID="${FILM_ID}"
+export LAB6_PLOT_VUS="${TARGET_VUS}"
+export K6_REMOTE_DIR="${K6_REMOTE_SUBDIR}"
+"${ROOT}/scripts/lab6-sync-png-from-k6-vm.sh"

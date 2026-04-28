@@ -23,9 +23,14 @@ mkdir -p \
   "${ROOT}/results/cpu-2"
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${BASE_URL%/}"
 TARGET_VUS="${TARGET_VUS:-30}"
 DURATION="${DURATION:-90s}"
 FILM_ID="${FILM_ID:-1}"
+# pc-to-server — k6 с ПК через туннель; server-to-server — k6 на ВМ, BASE_URL до приложения по сети
+K6_ROUTE="${K6_ROUTE:-pc-to-server}"
+
+echo "=== LAB6 sweep: BASE_URL=${BASE_URL} TARGET_VUS=${TARGET_VUS} DURATION=${DURATION} FILM_ID=${FILM_ID} K6_ROUTE=${K6_ROUTE} ==="
 
 normalize_result_cpu() {
   local x="${1// /}"
@@ -41,13 +46,16 @@ normalize_result_cpu() {
 run_one() {
   local share="$1"
   local tag="$2"
+  local sum="k6/reports/lab6-summary-${tag}-vus-${TARGET_VUS}.json"
   echo "=== POST_SHARE=$share ($tag) TARGET_VUS=$TARGET_VUS DURATION=$DURATION ==="
-  k6 run --summary-export "k6/reports/lab6-summary-${tag}-vus-${TARGET_VUS}.json" \
+  k6 run \
+    -e "LAB6_SUMMARY_FILE=$sum" \
     -e "BASE_URL=$BASE_URL" \
     -e "TARGET_VUS=$TARGET_VUS" \
     -e "POST_SHARE=$share" \
     -e "DURATION=$DURATION" \
     -e "FILM_ID=$FILM_ID" \
+    -e "K6_ROUTE=$K6_ROUTE" \
     k6/cinema-lab6-constant.js
 }
 
@@ -82,8 +90,8 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
       exit 1
     fi
     mkdir -p "${ROOT}/png_k6"
-    echo "LAB6_AUTO_PLOT: python3 $plot_py ${ROOT}/results -o ${ROOT}/png_k6"
-    python3 "$plot_py" "${ROOT}/results" -o "${ROOT}/png_k6"
+    echo "LAB6_AUTO_PLOT: python3 $plot_py ${ROOT}/results -o ${ROOT}/png_k6 --vus ${TARGET_VUS}"
+    python3 "$plot_py" "${ROOT}/results" -o "${ROOT}/png_k6" --vus "${TARGET_VUS}"
   fi
 else
   echo "Подсказка: задайте RESULT_CPU=0.5|1.0|1.5|2 — тогда JSON продублируются в results/cpu-<метка>/."

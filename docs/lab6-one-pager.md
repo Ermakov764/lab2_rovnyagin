@@ -74,13 +74,19 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 
 ```bash
 export TARGET_VUS=30
+export DURATION=90s
 export BASE_URL=http://127.0.0.1:8080   # с ПК при открытом туннеле
+export K6_ROUTE=pc-to-server            # или server-to-server — попадёт в JSON и подпись PNG
 # или BASE_URL=http://<IP_приложения>:8080 — с машины, откуда виден API
 ./k6/run-lab6-ratio-sweep.sh
 ```
 
+`K6_ROUTE`: **`pc-to-server`** — k6 с ПК через SSH-туннель к `BASE_URL`; **`server-to-server`** — k6 на учебной ВМ, `BASE_URL` до приложения по сети (как в **`remote-k6-sync-and-run.sh`**, там по умолчанию уже `server-to-server`). В каждом JSON есть **`lab6_meta`** (VU, длительность, URL, маршрут) — **`plot_lab6_from_results.py`** выводит это в заголовок графика.
+
 Копирование отчётов по CPU: `RESULT_CPU=0.5|1.0|1.5|2 ./k6/run-lab6-ratio-sweep.sh`  
-Графики: `python3 k6/plot_lab6_from_results.py results` (нужен matplotlib)
+Графики: `python3 k6/plot_lab6_from_results.py results -o png_k6` (нужен matplotlib). Скрипт требует **`lab6_meta`** во всех JSON и однородную серию прогонов — иначе выход с ошибкой.
+
+**Тяжелее аналитика (опционально):** больше строк в БД — **`./tools/run-seed.sh`** или `COUNT=… ./tools/run-seed.sh` перед серией прогонов (один и тот же объём данных на всю серию).
 
 **ТЗ:** два прогона — **ПК → сервер** (туннель + k6 на ПК) и **сервер → сервер** (k6 там, где корректен `BASE_URL`).
 

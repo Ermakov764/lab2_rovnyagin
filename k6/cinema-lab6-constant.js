@@ -15,11 +15,13 @@ const getAnalyticsMs = new Trend('k6_get_analytics_ms');
  *   POST_SHARE — доля VU под POST в [0..1]
  *   DURATION   — длительность ступени с постоянными VU (по умолчанию 90s)
  *   FILM_ID    — для GET /api/tickets/analytics/max-viewers
+ *   LAB6_SUMMARY_FILE — путь JSON (задаёт run-lab6-ratio-sweep.sh)
+ *   K6_ROUTE   — pc-to-server | server-to-server (для подписи графиков / отчёта)
  */
 const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
 const filmId = __ENV.FILM_ID || '1';
 const postShare = Number(__ENV.POST_SHARE || '0.5');
-const targetVus = Number(__ENV.TARGET_VUS || '20');
+const targetVus = Number(__ENV.TARGET_VUS || '30');
 const duration = __ENV.DURATION || '90s';
 
 // Округление долей; при малых TARGET_VUS гарантируем хотя бы 1 VU в «нужной» стороне
@@ -88,4 +90,32 @@ export function getAnalytics() {
   getAnalyticsMs.add(res.timings.duration);
   check(res, { 'GET 200': (r) => r.status === 200 });
   sleep(0.05);
+}
+
+/**
+ * Пишем summary JSON с блоком lab6_meta (TARGET_VUS, DURATION, BASE_URL, K6_ROUTE)
+ * для подписей plot_lab6_from_results.py и единой серии прогонов.
+ */
+export function handleSummary(data) {
+  const outPath = __ENV.LAB6_SUMMARY_FILE;
+  if (!outPath) {
+    throw new Error(
+      'LAB6_SUMMARY_FILE не задан — запускайте только через k6/run-lab6-ratio-sweep.sh (или передайте -e LAB6_SUMMARY_FILE=...).',
+    );
+  }
+  const enriched = {
+    ...data,
+    lab6_meta: {
+      target_vus: Number(__ENV.TARGET_VUS || '0'),
+      duration: __ENV.DURATION || '',
+      base_url: __ENV.BASE_URL || '',
+      k6_route: __ENV.K6_ROUTE || 'pc-to-server',
+      post_share: Number(__ENV.POST_SHARE || '0'),
+      film_id: String(__ENV.FILM_ID || '1'),
+      scenario: 'cinema-lab6-constant',
+    },
+  };
+  return {
+    [outPath]: JSON.stringify(enriched, null, 2),
+  };
 }

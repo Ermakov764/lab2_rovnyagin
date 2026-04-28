@@ -34,6 +34,7 @@ fail() { echo "Ошибка: $*" >&2; exit 1; }
 : "${TARGET_VUS:=30}"
 : "${DURATION:=90s}"
 : "${FILM_ID:=1}"
+: "${K6_ROUTE:=server-to-server}"
 : "${LAB6_CPUS:=0.5 1.0 1.5 2}"
 
 REMOTE="${K6_SSH_USER}@${K6_SSH_HOST}"
@@ -95,7 +96,7 @@ for cpu in ${LAB6_CPUS}; do
   docker compose up -d --force-recreate app
   wait_app_http
 
-  export K6_SSH_HOST K6_SSH_PORT K6_SSH_USER K6_REMOTE_DIR BASE_URL TARGET_VUS DURATION FILM_ID
+  export K6_SSH_HOST K6_SSH_PORT K6_SSH_USER K6_REMOTE_DIR BASE_URL TARGET_VUS DURATION FILM_ID K6_ROUTE
   export RESULT_CPU="$cpu"
   bash "${ROOT}/k6/remote-k6-sync-and-run.sh"
 done
@@ -108,8 +109,8 @@ scp -P "${K6_SSH_PORT}" -r "${REMOTE}:${K6_REMOTE_DIR}/results/"* "${LOCAL_PULL}
 
 echo "=== PNG в ${PNG_DIR} ==="
 mkdir -p "$PNG_DIR"
-rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png "${PNG_DIR}"/lab6-cpu-*.png 2>/dev/null || true
-python3 "${ROOT}/k6/plot_lab6_from_results.py" "$LOCAL_PULL" -o "$PNG_DIR"
+rm -f "${PNG_DIR}"/lab6-vs-cpu-*.png 2>/dev/null || true
+python3 "${ROOT}/k6/plot_lab6_from_results.py" "$LOCAL_PULL" -o "$PNG_DIR" --vus "${TARGET_VUS}"
 
 echo ""
-echo "Готово. Актуальные графики (ТЗ п.10): ${PNG_DIR}/lab6-vs-cpu-mix-*.png"
+echo "Готово. Актуальные графики (3 шт.): ${PNG_DIR}/lab6-vs-cpu-mix-*.png"

@@ -14,6 +14,10 @@
 #   export RESULT_CPU=1.5   # куда сложить JSON: results/cpu-1.5/ (0.5 | 1.0 | 1.5 | 2)
 #   ./k6/remote-k6-sync-and-run.sh
 #
+# Если ПК не в одной сети с приложением, curl до BASE_URL с ПК падает по таймауту —
+# прогон k6 всё равно идёт на k6-ВМ, где BASE_URL должен открываться. Тогда:
+#   export LAB6_SKIP_LOCAL_APP_CHECK=1
+#
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,7 +40,9 @@ warn() {
 : "${TARGET_VUS:=30}"
 : "${DURATION:=90s}"
 : "${FILM_ID:=1}"
+: "${K6_ROUTE:=server-to-server}"
 : "${RESULT_CPU:?Задайте RESULT_CPU — метка прогона для папки results/cpu-* : 0.5, 1.0, 1.5 или 2 (совпадайте с APP_CPU_LIMIT на ВМ с приложением)}"
+: "${LAB6_SKIP_LOCAL_APP_CHECK:=0}"
 
 BASE_URL="${BASE_URL%/}"
 REMOTE="${K6_SSH_USER}@${K6_SSH_HOST}"
@@ -53,32 +59,36 @@ command -v rsync >/dev/null 2>&1 || fail "Нет rsync — на этой маш�
 command -v curl >/dev/null 2>&1 || fail "Нет команды curl — установите пакет curl."
 
 root_code="000"
-if root_code=$(curl -sS --connect-timeout 8 --max-time 20 -o /dev/null -w "%{http_code}" "${BASE_URL}/" 2>/dev/null); then
-  :
+if [[ "${LAB6_SKIP_LOCAL_APP_CHECK}" == "1" ]]; then
+  warn "LAB6_SKIP_LOCAL_APP_CHECK=1: пропуск curl с этой машины до ${BASE_URL}. Убедитесь, что с k6-ВМ тот же URL открывается (иначе прогон упадёт)."
 else
-  root_code="000"
-fi
+  if root_code=$(curl -sS --connect-timeout 8 --max-time 20 -o /dev/null -w "%{http_code}" "${BASE_URL}/" 2>/dev/null); then
+    :
+  else
+    root_code="000"
+  fi
 
-if [[ "$root_code" == "000" || -z "$root_code" ]]; then
-  fail "Приложение не отвечает по ${BASE_URL}/ (нет HTTP-кода: таймаут или соединение отклонено). На ВМ с приложением выполните: cd ~/lab2_rovnyagin && docker compose ps && curl -sS -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8080/"
-fi
+  if [[ "$root_code" == "000" || -z "$root_code" ]]; then
+    fail "Приложение не отвечает по ${BASE_URL}/ с этой машины (таймаут или соединение отклонено). Если ПК вне сети приложения — задайте LAB6_SKIP_LOCAL_APP_CHECK=1 и проверьте доступность URL с k6-ВМ. На ВМ с приложением: cd ~/lab2_rovnyagin && docker compose ps && curl -sS -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8080/"
+  fi
 
-if [[ "$root_code" =~ ^[45][0-9][0-9]$ ]]; then
-  fail "Приложение по ${BASE_URL}/ вернуло HTTP ${root_code}. Ожидались 2xx или 3xx. Смотрите: docker compose logs app"
-fi
+  if [[ "$root_code" =~ ^[45][0-9][0-9]$ ]]; then
+    fail "Приложение по ${BASE_URL}/ вернуло HTTP ${root_code}. Ожидались 2xx или 3xx. Смотрите: docker compose logs app"
+  fi
 
-analytics_url="${BASE_URL}/api/tickets/analytics/max-viewers?filmId=${FILM_ID}"
-acode="000"
-if acode=$(curl -sS --connect-timeout 8 --max-time 20 -o /dev/null -w "%{http_code}" "${analytics_url}" 2>/dev/null); then
-  :
-else
+  analytics_url="${BASE_URL}/api/tickets/analytics/max-viewers?filmId=${FILM_ID}"
   acode="000"
-fi
+  if acode=$(curl -sS --connect-timeout 8 --max-time 20 -o /dev/null -w "%{http_code}" "${analytics_url}" 2>/dev/null); then
+    :
+  else
+    acode="000"
+  fi
 
-if [[ "$acode" == "000" ]]; then
-  warn "Не удалось получить ответ от ${analytics_url} (таймаут/сеть). k6 может упасть на проверках GET."
-elif [[ "$acode" != "200" ]]; then
-  warn "GET analytics вернул HTTP ${acode} (ожидают 200 для FILM_ID=${FILM_ID}). Проверьте БД и Flyway/сид."
+  if [[ "$acode" == "000" ]]; then
+    warn "Не удалось получить ответ от ${analytics_url} (таймаут/сеть). k6 может упасть на проверках GET."
+  elif [[ "$acode" != "200" ]]; then
+    warn "GET analytics вернул HTTP ${acode} (ожидают 200 для FILM_ID=${FILM_ID}). Проверьте БД и Flyway/сид."
+  fi
 fi
 
 if ! "${SSH[@]}" true 2>/dev/null; then
@@ -90,7 +100,11 @@ if [[ -z "$k6_path" ]]; then
   fail "На ${REMOTE} не найден k6 (command -v k6 пусто). Установите k6 на общей машине."
 fi
 
-echo "    OK: сценарии, ${BASE_URL}/ → HTTP ${root_code}, SSH, k6 → ${k6_path}"
+if [[ "${LAB6_SKIP_LOCAL_APP_CHECK}" == "1" ]]; then
+  echo "    OK: сценарии, SSH, k6 → ${k6_path} (локальный curl к приложению пропущен)"
+else
+  echo "    OK: сценарии, ${BASE_URL}/ → HTTP ${root_code}, SSH, k6 → ${k6_path}"
+fi
 
 echo "==> rsync ${ROOT}/k6/ -> ${REMOTE}:${K6_REMOTE_DIR}/k6/"
 echo "    (исключено: локальный k6/reports — удалённый k6/reports/ не перезаписывается и не удаляется)"
@@ -113,6 +127,7 @@ export BASE_URL='${BASE_URL}'
 export TARGET_VUS='${TARGET_VUS}'
 export DURATION='${DURATION}'
 export FILM_ID='${FILM_ID}'
+export K6_ROUTE='${K6_ROUTE}'
 export RESULT_CPU='${RESULT_CPU}'
 ./k6/run-lab6-ratio-sweep.sh
 EOF
