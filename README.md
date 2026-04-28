@@ -10,6 +10,114 @@
 
 **Навигация:** эндпоинты, требования, быстрый старт Docker → **лаб. 6** (в т.ч. **«Полный порядок: hl03 + k6-ВМ + ПК»**) → **лаб. 7** → лаб. 5 → лаб. 4 → прочее.
 
+## Защита лаб. 6: шпаргалка (k6, график vs CPU)
+
+Краткий сценарий на защите: приложение на **ВМ приложения** (например hl03); для сценария **сервер → сервер** k6 на **общей k6-ВМ** (например hl11); для **ПК → сервер** k6 запускают **на ПК** (или синхронизируют `k6/` из репозитория). Перед серией меняют **`APP_CPU_LIMIT`** на ВМ приложения и **`RESULT_CPU`** в прогонах — значения должны **совпадать** по шагам **0.5 / 1 / 1.5 / 2**.
+
+**Перед каждым значением `RESULT_CPU`:** на ВМ с Docker выставить **тот же** **`APP_CPU_LIMIT`** в `.env` и пересоздать контейнер приложения, например `docker compose up -d --force-recreate app` (или `docker compose -f docker-compose.lab7-app.yml --env-file .env up -d --force-recreate app` для лаб. 7). Логичный порядок точек на графике: **0.5 → 1.0 → 1.5 → 2** (можно гонять в любом порядке, если лимит и метка совпадают).
+
+**`FILM_ID`** — фильм, для которого в БД есть билеты под аналитический GET.
+
+### Сервер → сервер (`K6_ROUTE=server-to-server`)
+
+**`BASE_URL`** — URL приложения **с точки зрения k6-ВМ** (пример: внутренняя сеть до хоста с приложением). Каталог на k6-ВМ **`~/ermakov_k6`** (код `k6/` синхронизируют с hl03 через `rsync`, git на k6-ВМ не обязателен).
+
+На **k6-ВМ** (после каждой смены `APP_CPU_LIMIT` на стороне приложения):
+
+```bash
+cd ~/ermakov_k6
+
+export BASE_URL=http://192.168.1.242:8080
+export K6_ROUTE=server-to-server
+export TARGET_VUS=400
+export DURATION=90s
+export FILM_ID=1
+export K6_NO_THRESHOLDS=1
+
+export RESULT_CPU=0.5
+./k6/run-lab6-ratio-sweep.sh
+
+export RESULT_CPU=1
+./k6/run-lab6-ratio-sweep.sh
+
+export RESULT_CPU=1.5
+./k6/run-lab6-ratio-sweep.sh
+
+export RESULT_CPU=2
+./k6/run-lab6-ratio-sweep.sh
+```
+
+В итоге в **`~/ermakov_k6/k6/reports-lab6-s2s/`** должно быть **12** файлов `s2s_cpu{05|10|15|20}_mix{05|50|95}.json`. Построение трёхпанельного PNG:
+
+```bash
+cd ~/ermakov_k6
+python3 k6/plot_k6_reports.py --lab6 k6/reports-lab6-s2s
+# → k6/reports-lab6-s2s/lab6_latency_vs_cpu.png
+```
+
+**С ПК** (когда прямой SSH к k6-ВМ по внутреннему IP недоступен): забрать отчёты с хоста, на который ходите по SSH курса (пример — **`hlssh.zil.digital`**, порт **2311**, пользователь **hl**, на сервере лежит **`~/ermakov_k6`**; путь к клону на ПК замените на свой):
+
+```bash
+cd ~/Desktop/Labs_Rovnyagin/lab2_rovnyagin
+mkdir -p k6/reports-lab6-s2s
+scp -r -P 2311 hl@hlssh.zil.digital:~/ermakov_k6/k6/reports-lab6-s2s/* ./k6/reports-lab6-s2s/
+```
+
+Построить график локально (нужен **matplotlib**):
+
+```bash
+cd ~/Desktop/Labs_Rovnyagin/lab2_rovnyagin
+python3 k6/plot_k6_reports.py --lab6 --title-suffix "сервер → сервер" k6/reports-lab6-s2s
+# → k6/reports-lab6-s2s/lab6_latency_vs_cpu.png
+```
+
+### ПК → сервер (`K6_ROUTE=pc-to-server`)
+
+Нагрузка идёт **с вашего компьютера** до приложения (часто через **SSH-туннель** на hl03, если прямой доступ к `8080` с ПК невозможен). **`BASE_URL`** должен открываться **с той машины, где выполняется k6** (обычно ПК).
+
+1. В **отдельном терминале** на ПК держать туннель на ВМ приложения (пример; порт и хост SSH подставьте свои):
+
+   ```bash
+   ssh -p 2311 -L 8080:127.0.0.1:8080 -N hl@hlssh.zil.digital
+   ```
+
+   Если локальный порт **8080 занят**, используйте другой, например **`-L 18080:127.0.0.1:8080`**, тогда в **`BASE_URL`** укажите `http://127.0.0.1:18080`.
+
+2. В **корне клона** на ПК (должен быть установлен **k6**):
+
+   ```bash
+   cd ~/Desktop/Labs_Rovnyagin/lab2_rovnyagin
+
+   export BASE_URL=http://127.0.0.1:8080
+   export K6_ROUTE=pc-to-server
+   export TARGET_VUS=400
+   export DURATION=90s
+   export FILM_ID=1
+   export K6_NO_THRESHOLDS=1
+
+   export RESULT_CPU=0.5
+   ./k6/run-lab6-ratio-sweep.sh
+
+   export RESULT_CPU=1
+   ./k6/run-lab6-ratio-sweep.sh
+
+   export RESULT_CPU=1.5
+   ./k6/run-lab6-ratio-sweep.sh
+
+   export RESULT_CPU=2
+   ./k6/run-lab6-ratio-sweep.sh
+   ```
+
+В итоге в **`k6/reports-lab6-pc/`** должно быть **12** файлов `pc_cpu{05|10|15|20}_mix{05|50|95}.json`. График:
+
+```bash
+cd ~/Desktop/Labs_Rovnyagin/lab2_rovnyagin
+python3 k6/plot_k6_reports.py --lab6 --title-suffix "ПК → сервер" k6/reports-lab6-pc
+# → k6/reports-lab6-pc/lab6_latency_vs_cpu.png
+```
+
+На защите дополнительно: **Postman** (или Swagger) — ручной вызов **`POST /api/films`** и **`GET /api/tickets/analytics/max-viewers`** с тем же смыслом, что в **`k6/cinema-lab6-constant.js`**.
+
 ## Эндпоинты
 
 ### OpenAPI / Swagger UI (документация REST)

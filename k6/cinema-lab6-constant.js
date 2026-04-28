@@ -41,12 +41,12 @@ export default function () {
       genre: 'Lab6',
       durationMinutes: 100,
     });
-    const res = http.post(`${baseUrl}/api/films`, body, jsonHeaders);
-    postFilmMs.add(res.timings.duration);
+    const res = http.post(`${baseUrl}/api/films`, body, jsonHeaders); // Создаем фильм
+    postFilmMs.add(res.timings.duration);                             // POST/api/films
     check(res, { 'POST 201': (r) => r.status === 201 });
   } else {
-    const url = `${baseUrl}/api/tickets/analytics/max-viewers?filmId=${filmId}`;
-    const res = http.get(url);
+    const url = `${baseUrl}/api/tickets/analytics/max-viewers?filmId=${filmId}`; // GET — аналитика по билетам для фильм
+    const res = http.get(url);                                       // GET/api/tickets/analytics/max-viewers?filmId=...
     getAnalyticsMs.add(res.timings.duration);
     check(res, { 'GET 200': (r) => r.status === 200 });
   }
