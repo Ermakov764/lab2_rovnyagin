@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+FROM eclipse-temurin:25-jdk-noble AS build
+WORKDIR /app
+
+COPY gradle gradle
+COPY gradlew build.gradle settings.gradle ./
+COPY additional-service/build.gradle additional-service/build.gradle
+COPY additional-service/src additional-service/src
+
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x gradlew \
+    && ./gradlew --no-daemon :additional-service:bootJar
+
+FROM eclipse-temurin:25-jre-noble
+WORKDIR /app
+
+RUN groupadd --system spring && useradd --system --gid spring spring
+USER spring:spring
+
+COPY --from=build /app/additional-service/build/libs/additional-service.jar app.jar
+
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar"]

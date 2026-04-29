@@ -87,10 +87,15 @@ def extract_vus_from_stem(stem: str) -> Optional[int]:
 
 
 def find_mix_json(
-    folder: Path, mix_pat: re.Pattern, vus_filter: Optional[int] = None
+    folder: Path,
+    mix_pat: re.Pattern,
+    vus_filter: Optional[int] = None,
+    summary_prefix: str = "lab6-summary",
 ) -> Optional[Path]:
     paths = sorted(
-        p for p in folder.glob("lab6-summary-*.json") if mix_pat.search(p.stem)
+        p
+        for p in folder.glob(f"{summary_prefix}-*.json")
+        if mix_pat.search(p.stem)
     )
     if not paths:
         return None
@@ -104,7 +109,7 @@ def find_mix_json(
     if len(vus_set) > 1:
         die(
             f"{folder.name}: в одном миксе лежат JSON с разным TARGET_VUS: {sorted(vus_set)}. "
-            f"Удалите лишние lab6-summary-*-vus-*.json или укажите: "
+            f"Удалите лишние {summary_prefix}-*-vus-*.json или укажите: "
             f"python3 k6/plot_lab6_from_results.py … --vus 400"
         )
     if not vus_set:
@@ -115,16 +120,19 @@ def find_mix_json(
 
 
 def missing_mix_issue(
-    folder: Path, mix_pat: re.Pattern, vus_filter: Optional[int]
+    folder: Path,
+    mix_pat: re.Pattern,
+    vus_filter: Optional[int],
+    summary_prefix: str = "lab6-summary",
 ) -> str:
     candidates = [
         p
-        for p in folder.glob("lab6-summary-*.json")
+        for p in folder.glob(f"{summary_prefix}-*.json")
         if mix_pat.search(p.stem)
     ]
     if not candidates:
         return (
-            f"В {folder.name} нет lab6-summary-* для микса «{mix_pat.pattern}»"
+            f"В {folder.name} нет {summary_prefix}-* для микса «{mix_pat.pattern}»"
         )
     if vus_filter is not None:
         vus_found = sorted(
@@ -139,7 +147,7 @@ def missing_mix_issue(
             f"(в папке только VU: {vus_found}). Нужен прогон: TARGET_VUS={vus_filter} "
             f"и RESULT_CPU для {folder.name}."
         )
-    return f"В {folder.name} нет lab6-summary-* для микса «{mix_pat.pattern}»"
+    return f"В {folder.name} нет {summary_prefix}-* для микса «{mix_pat.pattern}»"
 
 
 def parse_lab6_meta(data: dict, path: Path) -> dict:
@@ -200,7 +208,10 @@ def build_subtitle(meta: dict) -> str:
 
 
 def collect_series_for_mix(
-    base: Path, mix_pat: re.Pattern, vus_filter: Optional[int] = None
+    base: Path,
+    mix_pat: re.Pattern,
+    vus_filter: Optional[int] = None,
+    summary_prefix: str = "lab6-summary",
 ) -> Tuple[List[Tuple[float, float, float]], int, dict, List[str]]:
     rows: List[Tuple[float, float, float, int, dict]] = []
     issues: List[str] = []
@@ -212,9 +223,9 @@ def collect_series_for_mix(
         cpu_v = cpu_float_from_dir(folder.name)
         if cpu_v is None:
             continue
-        path = find_mix_json(folder, mix_pat, vus_filter)
+        path = find_mix_json(folder, mix_pat, vus_filter, summary_prefix)
         if not path:
-            issues.append(missing_mix_issue(folder, mix_pat, vus_filter))
+            issues.append(missing_mix_issue(folder, mix_pat, vus_filter, summary_prefix))
             continue
         with path.open(encoding="utf-8") as f:
             data = json.load(f)
@@ -267,6 +278,9 @@ def plot_mix(
     mix_label: str,
     file_slug: str,
     meta: dict,
+    title_tag: str = "Лаб. 6: время отклика vs CPU",
+    png_prefix: str = "lab6-vs-cpu",
+    get_legend: str = "GET analytics (среднее, мс)",
 ) -> None:
     try:
         import matplotlib.pyplot as plt
@@ -291,7 +305,7 @@ def plot_mix(
         x_cpu,
         y_get,
         "s-",
-        label="GET analytics (среднее, мс)",
+        label=get_legend,
         color="#ff7f0e",
         linewidth=2,
         markersize=7,
@@ -302,13 +316,13 @@ def plot_mix(
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper right", framealpha=0.9)
 
-    line1 = "Лаб. 6: время отклика vs CPU"
+    line1 = title_tag
     line2 = build_subtitle(meta)
     ax.set_title(f"{line1}\n{line2}\n{mix_label}", fontsize=10)
 
     fig.tight_layout()
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"lab6-vs-cpu-{file_slug}.png"
+    path = out_dir / f"{png_prefix}-{file_slug}.png"
     fig.savefig(path, dpi=150)
     plt.close(fig)
     print(f"OK: {path}")
@@ -337,7 +351,31 @@ def main() -> None:
         type=int,
         default=None,
         metavar="N",
-        help="Брать только lab6-summary-*-vus-N.json (если в папках смешаны 30 и 400)",
+        help="Брать только <summary-prefix>-*-vus-N.json (если в папках смешаны 30 и 400)",
+    )
+    p.add_argument(
+        "--summary-prefix",
+        default="lab6-summary",
+        metavar="PREFIX",
+        help="Префикс имён JSON (lab6-summary или lab8-summary)",
+    )
+    p.add_argument(
+        "--title-tag",
+        default="Лаб. 6: время отклика vs CPU",
+        metavar="TEXT",
+        help="Первая строка заголовка графика",
+    )
+    p.add_argument(
+        "--png-prefix",
+        default="lab6-vs-cpu",
+        metavar="PREFIX",
+        help="Префикс имён PNG (lab6-vs-cpu или lab8-vs-cpu)",
+    )
+    p.add_argument(
+        "--get-legend",
+        default="GET analytics (среднее, мс)",
+        metavar="TEXT",
+        help="Подпись легенды для GET-ветки",
     )
     args = p.parse_args()
     base = args.results.resolve()
@@ -358,7 +396,10 @@ def main() -> None:
 
     for mix_pat, mix_label, file_slug in MIX_SPECS:
         series, _vus, meta, issues = collect_series_for_mix(
-            base, mix_pat, vus_filter=args.vus
+            base,
+            mix_pat,
+            vus_filter=args.vus,
+            summary_prefix=args.summary_prefix,
         )
         all_issues.extend(issues)
         if len(series) < 1:
@@ -379,9 +420,18 @@ def main() -> None:
         die("Исправьте results/cpu-* или переснимите прогоны.")
 
     for series, meta, file_slug, mix_label in to_plot:
-        plot_mix(out, series, mix_label, file_slug, meta)
+        plot_mix(
+            out,
+            series,
+            mix_label,
+            file_slug,
+            meta,
+            title_tag=args.title_tag,
+            png_prefix=args.png_prefix,
+            get_legend=args.get_legend,
+        )
 
-    if not to_plot or not any(out.glob("lab6-vs-cpu-*.png")):
+    if not to_plot or not any(out.glob(f"{args.png_prefix}-*.png")):
         die("Ни одного PNG не сгенерировано")
 
 

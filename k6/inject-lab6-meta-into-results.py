@@ -64,6 +64,12 @@ def main() -> None:
         help="Перезаписать уже существующий lab6_meta",
     )
     p.add_argument(
+        "--summary-prefix",
+        default="lab6-summary",
+        metavar="PREFIX",
+        help="Префикс имён JSON (lab6-summary, lab8-summary, …)",
+    )
+    p.add_argument(
         "--dry-run",
         action="store_true",
         help="Только показать, какие файлы изменились бы",
@@ -81,7 +87,7 @@ def main() -> None:
     for folder in sorted(base.iterdir()):
         if not folder.is_dir() or not folder.name.lower().startswith("cpu-"):
             continue
-        for path in sorted(folder.glob("lab6-summary-*.json")):
+        for path in sorted(folder.glob(f"{args.summary_prefix}-*.json")):
             with path.open(encoding="utf-8") as f:
                 data = json.load(f)
             if "lab6_meta" in data and isinstance(data["lab6_meta"], dict) and not args.force:
@@ -109,7 +115,7 @@ def main() -> None:
 
     if changed == 0:
         print(
-            "Нет файлов без lab6_meta (или нет lab6-summary-*.json). "
+            f"Нет файлов без lab6_meta (или нет {args.summary_prefix}-*.json). "
             "Уже заполнено — для перезаписи: --force",
             file=sys.stderr,
         )

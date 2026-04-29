@@ -1,14 +1,18 @@
-# Лабораторные №6–7: «Кинотеатр» (Cinema)
+# Лабораторные №6–8: «Кинотеатр» (Cinema)
 
 Учебный проект: **Spring Boot 4**, **Spring Data JPA**, **PostgreSQL**, **Flyway**, **Docker Compose** (приложение, БД, **pgAdmin**). Предметная область — бронирование билетов (**Film**, **Viewer**, **Ticket**): REST API, HTML-формы, аналитика по билетам. Опциональный профиль **`inmemory`** (без БД).
 
 **Лаб. 6** (текст **`ТЗ_6лаба.txt`**, **`docs/lab6-one-pager.md`**, **`docs/lab6-report-png_k6.md`**): развёртывание на **персональной ВМ**, образ в **Docker Hub**, лимиты **CPU/RAM**, **SSH-туннель** к **8080**, нагрузка **k6**. Раздел **«Лабораторная работа №6»** — подробная шпаргалка по этой работе.
 
-**Лаб. 7** (текст **`ТЗ_7лаба.txt`**): **PostgreSQL на отдельном узле** (**`hl12.zil`** / сервер БД курса), приложение на **другой ВМ**, JDBC через **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, в compose у Postgres **`max_connections=1000`**. Раздел **«Лабораторная работа №7»** ниже — **полное пошаговое описание** (в т. ч. общий стенд с базами **`hl1`…`hl10`**, порты **5433/5051**, скрипт **`scripts/ssh-tunnel-personal-vm.sh`**).
+**Лаб. 7–8** (тексты **`ТЗ_7лаба.txt`**, **`ТЗ_8лаба.txt`**) — **одна логическая лабораторная** в README:  
+- **Часть 7 — БД на отдельном узле:** **PostgreSQL** на **`hl12.zil`**, приложение на другой ВМ, **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, **`max_connections=1000`**, **`docker-compose.lab7-*.yml`**, туннели к **pgAdmin**.  
+- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`**, два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`png_k8/`**.
+
+Раздел **`## Лабораторная работа №7–8`** ниже объединяет обе части (**сначала лаб. 7, затем лаб. 8**).
 
 **Тот же репозиторий** содержит материалы **лаб. 5** (сидирование), **лаб. 4** (k6), **лаб. 3** (Docker/Flyway) — как справка.
 
-**Навигация:** эндпоинты, требования, быстрый старт Docker → **лаб. 6** (в т.ч. **«Полный порядок: hl03 + k6-ВМ + ПК»**) → **лаб. 7** → лаб. 5 → лаб. 4 → прочее.
+**Навигация:** эндпоинты, требования, быстрый старт Docker → **лаб. 6** (в т.ч. **«Полный порядок: hl03 + k6-ВМ + ПК»**) → **лаб. 7–8** → лаб. 5 → лаб. 4 → прочее.
 
 ## Защита лаб. 6: шпаргалка (k6, график vs CPU)
 
@@ -202,7 +206,7 @@ python3 k6/plot_k6_reports.py --lab6 --title-suffix "ПК → сервер" k6/r
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
 - **Лаб. 6 (сдача):** доступ по **SSH** к персональной ВМ курса; на ПК — **Git**, клиент **SSH**; для сценария с общей k6-ВМ — **`rsync`**, **`ssh-copy-id`** (см. **`k6/remote-k6-sync-and-run.sh`**); **Python 3** + **matplotlib** для **`k6/plot_lab6_from_results.py`**
-- **Лаб. 7:** SSH к **персональной ВМ** (порт из таблицы) и при необходимости к **серверу БД** (часто **2312**); на ВМ приложения — **Docker**, **`docker-compose.lab7-app.yml`**, **`.env`** с **`DBHOST`/`DBPORT`/`DBNAME`**; см. раздел **«Лабораторная работа №7»**
+- **Лаб. 7–8:** SSH к **персональной ВМ** и при необходимости к **серверу БД** (часто **2312**); **`docker-compose.lab7-app.yml`** / **`docker-compose.lab8.yml`**; см. раздел **«Лабораторная работа №7–8»**
 - **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
 - **Лаб. 5:** Python 3.10+; зависимости сидера — `pip install -r tools/requirements-seed.txt` **или** запуск **`./tools/run-seed.sh`** (на Linux при ограничении системного `pip`, PEP 668, скрипт создаёт **`tools/.venv`** и ставит пакеты туда)
 
@@ -561,9 +565,12 @@ lab2_rovnyagin/
 ├── docker-compose.yml # postgresdb + app + pgadmin; лаб. 6: limits, env для JDBC/Tomcat/JPA
 ├── docker-compose.lab7-db.yml   # Лаб. 7: только Postgres + pgAdmin (узел БД, max_connections=1000)
 ├── docker-compose.lab7-app.yml  # Лаб. 7: только app (DBHOST по умолчанию hl12.zil)
+├── docker-compose.lab8.yml      # Лаб. 8: Postgres + CRUD + Additional (CPU limits на обоих)
+├── Dockerfile.additional-service # Лаб. 8: образ только Additional service
+├── additional-service/           # Лаб. 8: второй Spring Boot (RestTemplate → CRUD)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
 ├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
-├── k6/                 # Лаб. 4/6: cinema-*.js, run-sweep.sh, run-lab6-ratio-sweep.sh, plot_k6_reports.py, reports-lab6-pc|s2s/
+├── k6/                 # Лаб. 4/6/8: cinema-*.js, run-sweep.sh, run-lab6-ratio-sweep.sh, run-lab8-ratio-sweep.sh, plot_lab6_from_results.py
 ├── scripts/            # Лаб. 6: ssh-tunnel-personal-vm.sh
 └── README.md                       # Этот файл
 ```
@@ -1315,7 +1322,11 @@ docker compose up -d --force-recreate app
 
 ---
 
-## Лабораторная работа №7: PostgreSQL на отдельном узле (hl12.zil)
+## Лабораторная работа №7–8: БД на hl12 (лаб. 7) и Additional service (лаб. 8)
+
+Две части одной связки по курсу: сначала вынесенная **PostgreSQL** и приложение по **`ТЗ_7лаба.txt`**, затем микросервис **Additional** и нагрузочные графики по **`ТЗ_8лаба.txt`**.
+
+### Лаб. 7 — PostgreSQL на отдельном узле (hl12.zil)
 
 Текст задания: **`ТЗ_7лаба.txt`**. Кратко по ТЗ:
 
@@ -1510,6 +1521,63 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 ### Чего не делать на общем hl12
 
 Не выполнять **`docker compose down -v`** на чужом стеке — снесёте данные **всем**. Не менять чужие базы **`hl1`…`hl10`** без согласования.
+
+---
+
+### Лаб. 8 — Additional service, RestTemplate, k6 как LAB6 (CPU 0.5 / 1.0)
+
+Текст задания: **`ТЗ_8лаба.txt`**.
+
+#### Идея
+
+- **Основной CRUD** (этот репозиторий) хранит данные и отдаёт, в т. ч. **`GET /api/tickets/analytics/max-viewers?filmId=`** и **`GET /api/films`**.
+- **Additional** (`additional-service/`, Spring Boot) по запросу с **названием фильма** сам вызывает CRUD (**`RestTemplate`**): список фильмов → поиск по `title` в **Java** → аналитика по `filmId`. **Join не в БД.**
+
+#### Эндпоинт Additional
+
+`GET /api/analytics/max-viewers-by-film-title?filmTitle=...` (порт по умолчанию **8081**, **`MAIN_CRUD_BASE_URL`** — URL контейнера/ВМ с CRUD).
+
+#### Сборка и Docker
+
+```bash
+./gradlew :additional-service:bootJar
+docker build -f Dockerfile.additional-service -t "$DOCKER_IMAGE_ADDITIONAL" .
+```
+
+Локально «два сервиса + Postgres»:
+
+```bash
+docker compose -f docker-compose.lab8.yml --env-file .env up -d --build
+# CRUD :8080, Additional :8081, лимиты CPU: APP_CPU_LIMIT / ADDITIONAL_CPU_LIMIT
+```
+
+В **`.env.example`** ищите **`DOCKER_IMAGE_ADDITIONAL`**, порты **`ADDITIONAL_PUBLISH_PORT`**.
+
+#### k8 (сервер → сервер), только **0.5** и **1.0** vCPU
+
+Для каждой точки: в **`.env`** выставить **`APP_CPU_LIMIT`** и **`ADDITIONAL_CPU_LIMIT`** (например оба **0.5**), пересоздать compose, на k6-ВМ:
+
+```bash
+export BASE_URL_MAIN=http://<хост_CRUD>:8080
+export BASE_URL_ADDITIONAL=http://<хост_Additional>:8081
+export K6_ROUTE=server-to-server
+export TARGET_VUS=400
+export FILM_TITLE=Интерстеллар
+export RESULT_CPU=0.5
+./k6/run-lab8-ratio-sweep.sh
+```
+
+Повторить с **1.0** vCPU и **`RESULT_CPU=1.0`**. В **`results/`** должны быть **`cpu-0.5/`** и **`cpu-1.0/`** с **`lab8-summary-*.json`**.
+
+Графики (как LAB6, но префиксы lab8):
+
+```bash
+python3 k6/plot_lab6_from_results.py results -o png_k8 \
+  --summary-prefix lab8-summary --vus 400 \
+  --title-tag "Лаб. 8 (Additional→CRUD)" \
+  --png-prefix lab8-vs-cpu \
+  --get-legend "GET Additional→CRUD (среднее, мс)"
+```
 
 ---
 
