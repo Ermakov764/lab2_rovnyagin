@@ -198,18 +198,21 @@ public class InMemoryTicketStore implements TicketStore {
                     .add(t.getViewer().getId());
         }
         List<Object[]> out = new ArrayList<>();
-        for (Map.Entry<Long, Map<LocalDate, Set<Long>>> fe : byFilmAndDay.entrySet()) {
-            Long filmId = fe.getKey();
+        List<Long> limitedIds = byFilmAndDay.keySet().stream()
+                .sorted()
+                .limit(maxRows)
+                .toList();
+        for (Long filmId : limitedIds) {
             String title = filmTitles.get(filmId);
-            fe.getValue().entrySet().stream()
+            Map<LocalDate, Set<Long>> days = byFilmAndDay.get(filmId);
+            if (days == null) {
+                continue;
+            }
+            days.entrySet().stream()
                     .sorted(Comparator.<Map.Entry<LocalDate, Set<Long>>>comparingLong(e -> (long) e.getValue().size()).reversed()
                             .thenComparing(Map.Entry::getKey))
                     .findFirst()
                     .ifPresent(best -> out.add(new Object[]{filmId, title, best.getKey(), (long) best.getValue().size()}));
-        }
-        out.sort(Comparator.comparing(a -> ((Long) a[0])));
-        if (maxRows < out.size()) {
-            return new ArrayList<>(out.subList(0, maxRows));
         }
         return out;
     }
