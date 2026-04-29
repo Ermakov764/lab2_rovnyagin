@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.hse.lab2.api.dto.FilmMaxViewersSummaryDto;
 import ru.hse.lab2.api.dto.MaxViewersPerDayDto;
 import ru.hse.lab2.api.request.TicketRequest;
 import ru.hse.lab2.entity.Film;
@@ -77,23 +76,6 @@ class TicketServiceTest {
 
         assertEquals(earlierDate, result.getSessionDate());
         assertEquals(10L, result.getViewersCount());
-    }
-
-    @Test
-    void getFilmMaxViewersSummary_picksBestDayPerFilm() {
-        when(ticketStore.findAllFilmDailyViewerAggregates(1000))
-                .thenReturn(List.of(
-                        new Object[]{1L, "A", LocalDate.of(2026, 4, 11), 12L},
-                        new Object[]{2L, "B", LocalDate.of(2026, 5, 1), 3L}
-                ));
-
-        List<FilmMaxViewersSummaryDto> result = ticketService.getFilmMaxViewersSummary(1000);
-
-        assertEquals(2, result.size());
-        FilmMaxViewersSummaryDto f1 = result.stream().filter(r -> r.filmId() == 1L).findFirst().orElseThrow();
-        assertEquals("A", f1.filmTitle());
-        assertEquals(LocalDate.of(2026, 4, 11), f1.day());
-        assertEquals(12L, f1.maxViewersOnSessionForDay());
     }
 
     @Test

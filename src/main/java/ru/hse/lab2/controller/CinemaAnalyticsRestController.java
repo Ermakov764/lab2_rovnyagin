@@ -1,42 +1,56 @@
 package ru.hse.lab2.controller;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.hse.lab2.api.dto.FilmMaxViewersSummaryDto;
-import ru.hse.lab2.service.TicketService;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.List;
+import java.net.URI;
 
 /**
- * Сводка по всем фильмам с билетами.
- * <p>
- * Путь вынесен из {@code TicketRestController}: у {@code GET /api/tickets/{id}} и
- * {@code GET /api/tickets/analytics/...} в ряде конфигураций Spring порядок сопоставления
- * мог приводить к тому, что запрос обрабатывался не тем хендлером (и соединение рвалось).
+ * GET /api/cinema/films/max-viewers-summary — прокси на AdditionalService: там сборка Summary и вызов
+ * {@link ru.hse.lab2.controller.InternalFilmAnalyticsRestController} через {@code MainCrudTicketClient}.
  */
 @RestController
 public class CinemaAnalyticsRestController {
 
-    private final TicketService ticketService;
+    private final RestTemplate additionalServiceRestTemplate;
+    private final String additionalServiceBaseUrl;
 
-    public CinemaAnalyticsRestController(TicketService ticketService) {
-        this.ticketService = ticketService;
+    public CinemaAnalyticsRestController(
+            @Qualifier("additionalServiceRestTemplate") RestTemplate additionalServiceRestTemplate,
+            @Value("${additional.service.base-url:http://additional-app:8081}") String additionalServiceBaseUrl
+    ) {
+        this.additionalServiceRestTemplate = additionalServiceRestTemplate;
+        this.additionalServiceBaseUrl = additionalServiceBaseUrl;
     }
 
-    /** Без БД — чтобы отличить «порт/прокси» от тяжёлого SQL. */
     @GetMapping("/api/cinema/ping")
     public String ping() {
         return "ok";
     }
 
-    @GetMapping({
-            "/api/cinema/films/max-viewers-summary",
-            "/api/tickets/analytics/max-viewers/by-films"
-    })
-    public List<FilmMaxViewersSummaryDto> filmMaxViewersSummary(
+    @GetMapping(
+            value = {
+                    "/api/cinema/films/max-viewers-summary",
+                    "/api/tickets/analytics/max-viewers/by-films"
+            },
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public String filmMaxViewersSummaryProxy(
             @RequestParam(required = false, defaultValue = "1000") int limit
     ) {
-        return ticketService.getFilmMaxViewersSummary(limit);
+        String base = additionalServiceBaseUrl.replaceAll("/+$", "");
+        URI uri = UriComponentsBuilder.fromUriString(base)
+                .path("/api/analytics/films/max-viewers-summary")
+                .queryParam("limit", limit)
+                .build(true)
+                .toUri();
+        String body = additionalServiceRestTemplate.getForObject(uri, String.class);
+        return body != null ? body : "[]";
     }
 }

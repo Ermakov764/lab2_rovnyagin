@@ -3,26 +3,24 @@ import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 
 /**
- * LAB 8 — как LAB 6 server-server, но GET идёт на Additional service:
- *   POST → основной CRUD /api/films
- *   GET → Additional /api/analytics/max-viewers-by-film-title (RestTemplate→CRUD внутри)
+ * LAB 8 нагрузка:
+ *   POST → основной CRUD POST /api/viewers (зрители с уникальным email)
+ *   GET → основной CRUD GET /api/cinema/films/max-viewers-summary (сводка; Additional может тем же клиентом дёрнуть CRUD через RestTemplate на 8081)
  *
  * Переменные:
- *   BASE_URL_MAIN     — основной CRUD (8080)
- *   BASE_URL_ADDITIONAL — Additional (8081)
- *   TARGET_VUS, POST_SHARE, DURATION, K6_ROUTE
- *   FILM_TITLE — фильм из БД для GET (по умолчанию «Интерстеллар» из Flyway V2)
+ *   BASE_URL_MAIN — CRUD (:8080)
+ *   SUMMARY_LIMIT — limit для GET summary (по умолчанию 100)
+ *   TARGET_VUS, POST_SHARE, DURATION
  *   LAB8_SUMMARY_FILE — JSON summary (run-lab8-ratio-sweep.sh)
  */
-const baseMain = __ENV.BASE_URL_MAIN || 'http://localhost:8080';
-const baseAdditional = __ENV.BASE_URL_ADDITIONAL || 'http://localhost:8081';
-const filmTitle = __ENV.FILM_TITLE || 'Интерстеллар';
+const baseMain = (__ENV.BASE_URL_MAIN || 'http://localhost:8080').replace(/\/+$/, '');
+const summaryLimit = __ENV.SUMMARY_LIMIT || '100';
 const postShare = Number(__ENV.POST_SHARE || '0.5');
 const targetVus = Number(__ENV.TARGET_VUS || '30');
 const duration = __ENV.DURATION || '90s';
 
-const postFilmMs = new Trend('post_ms');
-const getAnalyticsMs = new Trend('get_ms');
+const postViewerMs = new Trend('post_ms');
+const getSummaryMs = new Trend('get_ms');
 
 export const options = {
   vus: targetVus,
@@ -37,21 +35,19 @@ const jsonHeaders = { headers: { 'Content-Type': 'application/json' } };
 
 export default function () {
   if (Math.random() < postShare) {
-    const title = `k6-L8-${__VU}-${__ITER}-${Date.now()}`;
+    const unique = `${__VU}-${__ITER}-${Date.now()}`;
     const body = JSON.stringify({
-      title,
-      genre: 'Lab8',
-      durationMinutes: 100,
+      name: `k6-L8-viewer-${unique}`,
+      email: `k6-l8-${unique}@k6.local`,
     });
-    const res = http.post(`${baseMain.replace(/\/+$/, '')}/api/films`, body, jsonHeaders);
-    postFilmMs.add(res.timings.duration);
-    check(res, { 'POST 201': (r) => r.status === 201 });
+    const res = http.post(`${baseMain}/api/viewers`, body, jsonHeaders);
+    postViewerMs.add(res.timings.duration);
+    check(res, { 'POST viewer 201': (r) => r.status === 201 });
   } else {
-    const q = encodeURIComponent(filmTitle);
-    const url = `${baseAdditional.replace(/\/+$/, '')}/api/analytics/max-viewers-by-film-title?filmTitle=${q}`;
+    const url = `${baseMain}/api/cinema/films/max-viewers-summary?limit=${encodeURIComponent(summaryLimit)}`;
     const res = http.get(url);
-    getAnalyticsMs.add(res.timings.duration);
-    check(res, { 'GET 200': (r) => r.status === 200 });
+    getSummaryMs.add(res.timings.duration);
+    check(res, { 'GET summary 200': (r) => r.status === 200 });
   }
   sleep(0.05);
 }
@@ -68,13 +64,11 @@ export function handleSummary(data) {
     lab6_meta: {
       target_vus: Number(__ENV.TARGET_VUS || '0'),
       duration: __ENV.DURATION || '',
-      base_url: __ENV.BASE_URL_ADDITIONAL || '',
-      base_url_main: __ENV.BASE_URL_MAIN || '',
-      k6_route: __ENV.K6_ROUTE || 'server-to-server',
+      base_url: __ENV.BASE_URL_MAIN || '',
+      summary_limit: String(__ENV.SUMMARY_LIMIT || ''),
       post_share: Number(__ENV.POST_SHARE || '0'),
-      film_id: String(__ENV.FILM_ID || '1'),
-      film_title: String(__ENV.FILM_TITLE || ''),
-      scenario: 'cinema-lab8-additional',
+      k6_route: __ENV.K6_ROUTE || 'server-to-server',
+      scenario: 'cinema-lab8-viewers-post-summary-get',
     },
   };
   return {

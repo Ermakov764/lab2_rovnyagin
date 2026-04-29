@@ -26,6 +26,10 @@ services:
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
+      ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
+    depends_on:
+      additional-app:
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -44,8 +48,6 @@ services:
     environment:
       SERVER_PORT: "8081"
       MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
-    depends_on:
-      - crud-app
     deploy:
       resources:
         limits:

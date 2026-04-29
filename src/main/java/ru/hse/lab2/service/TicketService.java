@@ -3,7 +3,6 @@ package ru.hse.lab2.service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.hse.lab2.api.dto.FilmMaxViewersSummaryDto;
 import ru.hse.lab2.api.dto.MaxViewersPerDayDto;
 import ru.hse.lab2.api.dto.TicketDto;
 import ru.hse.lab2.api.dto.TopFilmByDayDto;
@@ -145,40 +144,6 @@ public class TicketService {
         LocalDate date = (LocalDate) top[0];
         long viewersCount = ((Number) top[1]).longValue();
         return new MaxViewersPerDayDto(film.getId(), date, viewersCount);
-    }
-
-    /**
-     * Сводка по фильмам с билетами; {@code limit} ограничивает число строк (тяжёлый ответ и CTE иначе рвут соединение).
-     */
-    @Transactional(readOnly = true)
-    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary(int limit) {
-        if (limit < 1 || limit > 50_000) {
-            throw new ValidationException("limit must be between 1 and 50000");
-        }
-        return ticketStore.findAllFilmDailyViewerAggregates(limit).stream()
-                .map(row -> new FilmMaxViewersSummaryDto(
-                        ((Number) row[0]).longValue(),
-                        row[1] != null ? String.valueOf(row[1]) : null,
-                        toLocalDate(row[2]),
-                        ((Number) row[3]).longValue()
-                ))
-                .toList();
-    }
-
-    private static LocalDate toLocalDate(Object o) {
-        if (o == null) {
-            throw new ValidationException("Analytics row has null date");
-        }
-        if (o instanceof LocalDate ld) {
-            return ld;
-        }
-        if (o instanceof java.sql.Date d) {
-            return d.toLocalDate();
-        }
-        if (o instanceof java.util.Date ud) {
-            return new java.sql.Date(ud.getTime()).toLocalDate();
-        }
-        throw new ValidationException("Unsupported date type in analytics: " + o.getClass());
     }
 
     @Transactional(readOnly = true)

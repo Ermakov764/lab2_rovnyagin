@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# LAB 8: три прогона с постоянными VU и смесиями POST/GET как в LAB 6,
-# но GET на Additional service (cinema-lab8-constant.js).
+# LAB 8: три прогона с постоянными VU и смесиями POST/GET:
+#   POST /api/viewers (CRUD), GET /api/cinema/films/max-viewers-summary (CRUD), см. k6/cinema-lab8-constant.js.
 #
 # Результаты: k6/reports/lab8-summary-*.json → при RESULT_CPU — results/cpu-*
 #
@@ -16,11 +16,10 @@ BASE_ADD="${BASE_URL_ADDITIONAL:-http://localhost:8081}"
 BASE_ADD="${BASE_ADD%/}"
 TARGET_VUS="${TARGET_VUS:-30}"
 DURATION="${DURATION:-90s}"
-FILM_ID="${FILM_ID:-1}"
-FILM_TITLE="${FILM_TITLE:-Интерстеллар}"
+SUMMARY_LIMIT="${SUMMARY_LIMIT:-100}"
 K6_ROUTE="${K6_ROUTE:-server-to-server}"
 
-echo "=== LAB8 sweep: MAIN=${BASE_MAIN} ADDITIONAL=${BASE_ADD} TARGET_VUS=${TARGET_VUS} FILM_TITLE=${FILM_TITLE} ==="
+echo "=== LAB8 sweep: MAIN=${BASE_MAIN} TARGET_VUS=${TARGET_VUS} SUMMARY_LIMIT=${SUMMARY_LIMIT} ==="
 
 normalize_result_cpu() {
   local x="${1// /}"
@@ -43,8 +42,7 @@ run_one() {
     -e "TARGET_VUS=${TARGET_VUS}" \
     -e "POST_SHARE=${share}" \
     -e "DURATION=${DURATION}" \
-    -e "FILM_ID=${FILM_ID}" \
-    -e "FILM_TITLE=${FILM_TITLE}" \
+    -e "SUMMARY_LIMIT=${SUMMARY_LIMIT}" \
     -e "K6_ROUTE=${K6_ROUTE}" \
     k6/cinema-lab8-constant.js
 }
@@ -79,9 +77,9 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
     python3 "$plot_py" "${ROOT}/results" -o "${ROOT}/png_k8" \
       --vus "${TARGET_VUS}" \
       --summary-prefix lab8-summary \
-      --title-tag "Лаб. 8 (Additional→CRUD)" \
+      --title-tag "Лаб. 8 (POST viewers / GET summary)" \
       --png-prefix lab8-vs-cpu \
-      --get-legend "GET Additional→CRUD (среднее, мс)"
+      --get-legend "GET /api/cinema/films/max-viewers-summary (среднее, мс)"
   fi
 else
   echo "Подсказка: RESULT_CPU=0.5|1.0 — копирование в results/cpu-<метка>/"
