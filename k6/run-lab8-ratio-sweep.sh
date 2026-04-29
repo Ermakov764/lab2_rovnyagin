@@ -79,6 +79,7 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
       --summary-prefix lab8-summary \
       --title-tag "Лаб. 8 (POST viewers / GET summary)" \
       --png-prefix lab8-vs-cpu \
+      --post-legend "POST /api/viewers (среднее, мс)" \
       --get-legend "GET /api/cinema/films/max-viewers-summary (среднее, мс)"
   fi
 else

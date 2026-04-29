@@ -1583,6 +1583,7 @@ python3 k6/plot_lab6_from_results.py results -o png_k8 \
   --summary-prefix lab8-summary --vus 400 \
   --title-tag "Лаб. 8 (Additional→CRUD)" \
   --png-prefix lab8-vs-cpu \
+  --post-legend "POST /api/viewers (среднее, мс)" \
   --get-legend "GET Additional→CRUD (среднее, мс)"
 ```
 

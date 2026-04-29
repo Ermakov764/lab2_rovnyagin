@@ -280,6 +280,7 @@ def plot_mix(
     meta: dict,
     title_tag: str = "Лаб. 6: время отклика vs CPU",
     png_prefix: str = "lab6-vs-cpu",
+    post_legend: str = "POST /api/films (среднее, мс)",
     get_legend: str = "GET analytics (среднее, мс)",
 ) -> None:
     try:
@@ -296,7 +297,7 @@ def plot_mix(
         x_cpu,
         y_post,
         "o-",
-        label="POST /api/films (среднее, мс)",
+        label=post_legend,
         color="#1f77b4",
         linewidth=2,
         markersize=8,
@@ -372,6 +373,12 @@ def main() -> None:
         help="Префикс имён PNG (lab6-vs-cpu или lab8-vs-cpu)",
     )
     p.add_argument(
+        "--post-legend",
+        default="POST /api/films (среднее, мс)",
+        metavar="TEXT",
+        help="Подпись легенды для POST-ветки (лаб. 8: POST /api/viewers)",
+    )
+    p.add_argument(
         "--get-legend",
         default="GET analytics (среднее, мс)",
         metavar="TEXT",
@@ -428,6 +435,7 @@ def main() -> None:
             meta,
             title_tag=args.title_tag,
             png_prefix=args.png_prefix,
+            post_legend=args.post_legend,
             get_legend=args.get_legend,
         )
 
