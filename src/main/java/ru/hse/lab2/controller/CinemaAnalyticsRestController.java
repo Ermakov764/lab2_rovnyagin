@@ -24,6 +24,12 @@ public class CinemaAnalyticsRestController {
         this.ticketService = ticketService;
     }
 
+    /** Без БД — чтобы отличить «порт/прокси» от тяжёлого SQL. */
+    @GetMapping("/api/cinema/ping")
+    public String ping() {
+        return "ok";
+    }
+
     @GetMapping({
             "/api/cinema/films/max-viewers-summary",
             "/api/tickets/analytics/max-viewers/by-films"

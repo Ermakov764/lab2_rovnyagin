@@ -42,29 +42,28 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Object[]> findTopFilmByDate(@Param("date") LocalDate date);
 
     /**
-     * PostgreSQL: только для первых {@code maxRows} фильмов по возрастанию id среди тех, у кого есть билеты,
-     * считается «лучший день» (как в однофильмовой аналитике). Без полного прохода по всем билетам таблицы —
-     * иначе CTE по всей базе делает запрос неподъёмным и рвёт TCP.
+     * PostgreSQL: первые {@code maxRows} фильмов по id среди имеющих билеты — через таблицу {@code films} + EXISTS,
+     * без DISTINCT по всей {@code tickets} (иначе многомиллионная таблица → seq scan/hash → время/память и reset TCP).
      */
     @Query(value = """
-        SELECT f.id AS fid, f.title AS ftitle, stats.d AS d, stats.vc AS vc
+        SELECT pick.fid, pick.ftitle, stats.d AS d, stats.vc AS vc
         FROM (
-            SELECT DISTINCT t.film_id AS film_id
-            FROM tickets t
-            ORDER BY t.film_id
+            SELECT f.id AS fid, f.title AS ftitle
+            FROM films f
+            WHERE EXISTS (SELECT 1 FROM tickets t WHERE t.film_id = f.id)
+            ORDER BY f.id
             LIMIT :maxRows
-        ) lim
-        INNER JOIN films f ON f.id = lim.film_id
+        ) pick
         INNER JOIN LATERAL (
             SELECT t.session_date AS d,
                    COUNT(DISTINCT t.viewer_id) AS vc
             FROM tickets t
-            WHERE t.film_id = lim.film_id
+            WHERE t.film_id = pick.fid
             GROUP BY t.session_date
             ORDER BY COUNT(DISTINCT t.viewer_id) DESC, t.session_date ASC
             LIMIT 1
         ) stats ON true
-        ORDER BY f.id
+        ORDER BY pick.fid
         """, nativeQuery = true)
     List<Object[]> findAllFilmDailyViewerAggregates(@Param("maxRows") int maxRows);
 }
