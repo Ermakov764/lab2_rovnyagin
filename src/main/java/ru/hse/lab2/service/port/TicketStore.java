@@ -33,4 +33,7 @@ public interface TicketStore {
     List<Object[]> findDailyViewerStatsByFilmId(Long filmId);
 
     List<Object[]> findTopFilmByDate(LocalDate date);
+
+    /** Строки (filmId, title, sessionDate, distinctViewersThatDay); дальнейший «лучший день» — в сервисе. */
+    List<Object[]> findAllFilmDailyViewerAggregates();
 }

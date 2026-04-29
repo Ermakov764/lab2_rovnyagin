@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import ru.hse.lab2.api.dto.FilmMaxViewersSummaryDto;
 import ru.hse.lab2.api.dto.MaxViewersPerDayDto;
 import ru.hse.lab2.api.dto.TicketDto;
 import ru.hse.lab2.api.dto.TopFilmByDayDto;
@@ -61,6 +62,15 @@ public class TicketRestController {
     @GetMapping("/analytics/max-viewers")
     public MaxViewersPerDayDto getMaxViewersPerDay(@RequestParam Long filmId) {
         return ticketService.getMaxViewersPerDayByFilm(filmId);
+    }
+
+    /**
+     * По каждому фильму, у которого есть билеты: календарный день с максимальной
+     * занятостью по той же метрике, что и для {@code max-viewers?filmId=}.
+     */
+    @GetMapping("/analytics/max-viewers/by-films")
+    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary() {
+        return ticketService.getFilmMaxViewersSummary();
     }
 
     @GetMapping("/analytics/top-film-by-day")

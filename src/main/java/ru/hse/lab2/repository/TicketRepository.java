@@ -40,4 +40,30 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         ORDER BY COUNT(DISTINCT t.viewer.id) DESC, t.film.id ASC
         """)
     List<Object[]> findTopFilmByDate(@Param("date") LocalDate date);
+
+    /**
+     * PostgreSQL: по каждому фильму с билетами — день с макс. числом уникальных зрителей
+     * и это число (как один ряд после «сведения», без миллиона строк «фильм×день» в JVM).
+     */
+    @Query(value = """
+        WITH daily AS (
+            SELECT f.id AS fid,
+                   f.title AS ftitle,
+                   t.session_date AS d,
+                   COUNT(DISTINCT t.viewer_id) AS vc
+            FROM tickets t
+            INNER JOIN films f ON f.id = t.film_id
+            GROUP BY f.id, f.title, t.session_date
+        ),
+        ranked AS (
+            SELECT fid, ftitle, d, vc,
+                   ROW_NUMBER() OVER (PARTITION BY fid ORDER BY vc DESC, d ASC) AS rn
+            FROM daily
+        )
+        SELECT fid, ftitle, d, vc
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY fid
+        """, nativeQuery = true)
+    List<Object[]> findAllFilmDailyViewerAggregates();
 }

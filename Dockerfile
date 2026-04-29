@@ -5,6 +5,9 @@ WORKDIR /app
 
 COPY gradle gradle
 COPY gradlew build.gradle settings.gradle ./
+# Модуль нужен Gradle (settings.gradle включает :additional-service)
+COPY additional-service/build.gradle additional-service/build.gradle
+COPY additional-service/src additional-service/src
 # Отдельный слой: тянет Gradle wrapper + Maven-зависимости (кэш переживает пересборки)
 RUN --mount=type=cache,target=/root/.gradle \
     chmod +x gradlew \

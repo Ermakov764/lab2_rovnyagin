@@ -80,4 +80,9 @@ public class JpaTicketStore implements TicketStore {
     public List<Object[]> findTopFilmByDate(LocalDate date) {
         return ticketRepository.findTopFilmByDate(date);
     }
+
+    @Override
+    public List<Object[]> findAllFilmDailyViewerAggregates() {
+        return ticketRepository.findAllFilmDailyViewerAggregates();
+    }
 }

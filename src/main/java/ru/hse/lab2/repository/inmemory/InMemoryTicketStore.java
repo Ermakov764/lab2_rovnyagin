@@ -12,6 +12,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -182,5 +183,31 @@ public class InMemoryTicketStore implements TicketStore {
                         it.getValue().getValue().size()
                 })
                 .toList();
+    }
+
+    @Override
+    public synchronized List<Object[]> findAllFilmDailyViewerAggregates() {
+        Map<Long, String> filmTitles = new LinkedHashMap<>();
+        Map<Long, Map<LocalDate, Set<Long>>> byFilmAndDay = new LinkedHashMap<>();
+        for (Ticket t : tickets.values()) {
+            Long filmId = t.getFilm().getId();
+            filmTitles.putIfAbsent(filmId, t.getFilm().getTitle());
+            byFilmAndDay
+                    .computeIfAbsent(filmId, ignored -> new LinkedHashMap<>())
+                    .computeIfAbsent(t.getSessionDate(), ignored -> new LinkedHashSet<>())
+                    .add(t.getViewer().getId());
+        }
+        List<Object[]> out = new ArrayList<>();
+        for (Map.Entry<Long, Map<LocalDate, Set<Long>>> fe : byFilmAndDay.entrySet()) {
+            Long filmId = fe.getKey();
+            String title = filmTitles.get(filmId);
+            fe.getValue().entrySet().stream()
+                    .sorted(Comparator.<Map.Entry<LocalDate, Set<Long>>>comparingLong(e -> (long) e.getValue().size()).reversed()
+                            .thenComparing(Map.Entry::getKey))
+                    .findFirst()
+                    .ifPresent(best -> out.add(new Object[]{filmId, title, best.getKey(), (long) best.getValue().size()}));
+        }
+        out.sort(Comparator.comparing(a -> ((Long) a[0])));
+        return out;
     }
 }
