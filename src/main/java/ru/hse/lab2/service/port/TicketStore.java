@@ -35,5 +35,5 @@ public interface TicketStore {
     List<Object[]> findTopFilmByDate(LocalDate date);
 
     /** Одна строка на фильм (best day); не больше {@code limit} фильмов, по возрастанию id. */
-    List<Object[]> findAllFilmDailyViewerAggregates(int limit);
+    List<Object[]> findAllFilmDailyViewerAggregates(int maxRows);
 }

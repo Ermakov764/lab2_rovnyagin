@@ -64,7 +64,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         FROM ranked
         WHERE rn = 1
         ORDER BY fid
-        LIMIT :limit
+        LIMIT :maxRows
         """, nativeQuery = true)
-    List<Object[]> findAllFilmDailyViewerAggregates(@Param("limit") int limit);
+    List<Object[]> findAllFilmDailyViewerAggregates(@Param("maxRows") int maxRows);
 }

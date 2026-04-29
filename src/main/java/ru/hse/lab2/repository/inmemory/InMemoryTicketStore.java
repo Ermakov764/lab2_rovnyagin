@@ -186,7 +186,7 @@ public class InMemoryTicketStore implements TicketStore {
     }
 
     @Override
-    public synchronized List<Object[]> findAllFilmDailyViewerAggregates(int limit) {
+    public synchronized List<Object[]> findAllFilmDailyViewerAggregates(int maxRows) {
         Map<Long, String> filmTitles = new LinkedHashMap<>();
         Map<Long, Map<LocalDate, Set<Long>>> byFilmAndDay = new LinkedHashMap<>();
         for (Ticket t : tickets.values()) {
@@ -208,8 +208,8 @@ public class InMemoryTicketStore implements TicketStore {
                     .ifPresent(best -> out.add(new Object[]{filmId, title, best.getKey(), (long) best.getValue().size()}));
         }
         out.sort(Comparator.comparing(a -> ((Long) a[0])));
-        if (limit < out.size()) {
-            return new ArrayList<>(out.subList(0, limit));
+        if (maxRows < out.size()) {
+            return new ArrayList<>(out.subList(0, maxRows));
         }
         return out;
     }
