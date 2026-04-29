@@ -4,7 +4,7 @@
 # Локально (БД в том же compose):
 #   docker compose -f docker-compose.lab8.yml --env-file .env up -d --build
 #
-# С БД на hl12 — поднимите только сервисы crud-app и additional-app с типичными переменными из docker-compose.lab7-app.yml + MAIN_CRUD_BASE_URL.
+# С БД на hl12 — без локального Postgres: см. docker-compose.lab8-hl12.yml и переменные как в docker-compose.lab7-app.yml.
 services:
   postgresdb:
     image: postgres:15-alpine

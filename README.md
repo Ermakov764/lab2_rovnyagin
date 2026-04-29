@@ -6,7 +6,7 @@
 
 **Лаб. 7–8** (тексты **`ТЗ_7лаба.txt`**, **`ТЗ_8лаба.txt`**) — **одна логическая лабораторная** в README:  
 - **Часть 7 — БД на отдельном узле:** **PostgreSQL** на **`hl12.zil`**, приложение на другой ВМ, **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, **`max_connections=1000`**, **`docker-compose.lab7-*.yml`**, туннели к **pgAdmin**.  
-- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`**, два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`png_k8/`**.
+- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`** (локальный Postgres) или **`docker-compose.lab8-hl12.yml`** (БД на hl12, как лаб. 7); два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`png_k8/`**.
 
 Раздел **`## Лабораторная работа №7–8`** ниже объединяет обе части (**сначала лаб. 7, затем лаб. 8**).
 
@@ -566,6 +566,7 @@ lab2_rovnyagin/
 ├── docker-compose.lab7-db.yml   # Лаб. 7: только Postgres + pgAdmin (узел БД, max_connections=1000)
 ├── docker-compose.lab7-app.yml  # Лаб. 7: только app (DBHOST по умолчанию hl12.zil)
 ├── docker-compose.lab8.yml      # Лаб. 8: Postgres + CRUD + Additional (CPU limits на обоих)
+├── docker-compose.lab8-hl12.yml # Лаб. 8: только CRUD + Additional; БД на hl12 (как лаб. 7)
 ├── Dockerfile.additional-service # Лаб. 8: образ только Additional service
 ├── additional-service/           # Лаб. 8: второй Spring Boot (RestTemplate → CRUD)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
@@ -1549,6 +1550,12 @@ docker build -f Dockerfile.additional-service -t "$DOCKER_IMAGE_ADDITIONAL" .
 ```bash
 docker compose -f docker-compose.lab8.yml --env-file .env up -d --build
 # CRUD :8080, Additional :8081, лимиты CPU: APP_CPU_LIMIT / ADDITIONAL_CPU_LIMIT
+```
+
+**БД на hl12** (без локального Postgres — как лаб. 7): **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`** как для **`docker-compose.lab7-app.yml`**, затем:
+
+```bash
+docker compose -f docker-compose.lab8-hl12.yml --env-file .env up -d
 ```
 
 В **`.env.example`** ищите **`DOCKER_IMAGE_ADDITIONAL`**, порты **`ADDITIONAL_PUBLISH_PORT`**.
