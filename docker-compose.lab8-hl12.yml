@@ -1,0 +1,56 @@
+# Лаб. 8 с БД на hl12 (логика лаб. 7): только CRUD + Additional, без локального Postgres.
+# Переменные DBHOST / DBPORT / DBNAME / SCHEMANAME — как для docker-compose.lab7-app.yml (сеть до hl12 должна быть доступна с ВМ).
+#
+# Пример:
+#   docker compose -f docker-compose.lab8-hl12.yml --env-file .env up -d
+#   docker compose -f docker-compose.lab8-hl12.yml logs crud-app --tail 80
+#
+# MAIN_CRUD_BASE_URL по умолчанию http://crud-app:8080 — имя сервиса внутри этой же compose-сети.
+
+services:
+  crud-app:
+    image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
+    container_name: lab8_crud_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PUBLISH_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DBHOST:-hl12.zil}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}
+      DBHOST: ${DBHOST:-hl12.zil}
+      DBPORT: ${DBPORT:-5432}
+      DBNAME: ${DBNAME:-lab2_db}
+      SCHEMANAME: ${SCHEMANAME:-public}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU_LIMIT:-0.5}"
+          memory: ${APP_MEMORY_LIMIT:-1536M}
+        reservations:
+          cpus: "${APP_CPU_RESERVATION:-0.25}"
+          memory: ${APP_MEMORY_RESERVATION:-256M}
+
+  additional-app:
+    image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
+    container_name: lab8_additional_app
+    restart: unless-stopped
+    ports:
+      - "${ADDITIONAL_PUBLISH_PORT:-8081}:8081"
+    environment:
+      SERVER_PORT: "8081"
+      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
+    depends_on:
+      - crud-app
+    deploy:
+      resources:
+        limits:
+          cpus: "${ADDITIONAL_CPU_LIMIT:-0.5}"
+          memory: ${ADDITIONAL_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: "${ADDITIONAL_CPU_RESERVATION:-0.1}"
+          memory: ${ADDITIONAL_MEMORY_RESERVATION:-128M}
