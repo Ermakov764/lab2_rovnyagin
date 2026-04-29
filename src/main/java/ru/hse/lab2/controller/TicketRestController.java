@@ -69,8 +69,10 @@ public class TicketRestController {
      * занятостью по той же метрике, что и для {@code max-viewers?filmId=}.
      */
     @GetMapping("/analytics/max-viewers/by-films")
-    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary() {
-        return ticketService.getFilmMaxViewersSummary();
+    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary(
+            @RequestParam(required = false, defaultValue = "1000") int limit
+    ) {
+        return ticketService.getFilmMaxViewersSummary(limit);
     }
 
     @GetMapping("/analytics/top-film-by-day")

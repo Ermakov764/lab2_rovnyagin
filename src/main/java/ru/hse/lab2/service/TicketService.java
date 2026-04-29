@@ -147,9 +147,15 @@ public class TicketService {
         return new MaxViewersPerDayDto(film.getId(), date, viewersCount);
     }
 
+    /**
+     * Сводка по фильмам с билетами; {@code limit} ограничивает число строк (тяжёлый ответ и CTE иначе рвут соединение).
+     */
     @Transactional(readOnly = true)
-    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary() {
-        return ticketStore.findAllFilmDailyViewerAggregates().stream()
+    public List<FilmMaxViewersSummaryDto> getFilmMaxViewersSummary(int limit) {
+        if (limit < 1 || limit > 50_000) {
+            throw new ValidationException("limit must be between 1 and 50000");
+        }
+        return ticketStore.findAllFilmDailyViewerAggregates(limit).stream()
                 .map(row -> new FilmMaxViewersSummaryDto(
                         ((Number) row[0]).longValue(),
                         row[1] != null ? String.valueOf(row[1]) : null,

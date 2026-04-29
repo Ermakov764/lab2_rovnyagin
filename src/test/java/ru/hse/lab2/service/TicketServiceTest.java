@@ -81,13 +81,13 @@ class TicketServiceTest {
 
     @Test
     void getFilmMaxViewersSummary_picksBestDayPerFilm() {
-        when(ticketStore.findAllFilmDailyViewerAggregates())
+        when(ticketStore.findAllFilmDailyViewerAggregates(1000))
                 .thenReturn(List.of(
                         new Object[]{1L, "A", LocalDate.of(2026, 4, 11), 12L},
                         new Object[]{2L, "B", LocalDate.of(2026, 5, 1), 3L}
                 ));
 
-        List<FilmMaxViewersSummaryDto> result = ticketService.getFilmMaxViewersSummary();
+        List<FilmMaxViewersSummaryDto> result = ticketService.getFilmMaxViewersSummary(1000);
 
         assertEquals(2, result.size());
         FilmMaxViewersSummaryDto f1 = result.stream().filter(r -> r.filmId() == 1L).findFirst().orElseThrow();

@@ -82,7 +82,7 @@ public class JpaTicketStore implements TicketStore {
     }
 
     @Override
-    public List<Object[]> findAllFilmDailyViewerAggregates() {
-        return ticketRepository.findAllFilmDailyViewerAggregates();
+    public List<Object[]> findAllFilmDailyViewerAggregates(int limit) {
+        return ticketRepository.findAllFilmDailyViewerAggregates(limit);
     }
 }
