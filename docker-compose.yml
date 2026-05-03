@@ -1,31 +1,11 @@
-# CRUD (:8080) + Additional (:8081) + локальный PostgreSQL (сервис postgresdb).
-# На ВМ: docker compose --env-file .env up -d
+# ТЗ (лаб. 7–8): PostgreSQL на отдельном узле (например hl12); в этом файле только CRUD (:8080) и Additional (:8081).
+# На ВМ приложений: docker compose --env-file .env up -d
+# JDBC задаётся в .env: DBHOST, DBPORT, DBNAME, SCHEMANAME или целиком SPRING_DATASOURCE_URL.
 #
-# Локально (как раньше): DBHOST=postgresdb — CRUD и БД в одной docker-сети.
-# Внешняя БД (hl12 и т.д.): уберите сервис postgresdb и volumes, выставьте DBHOST на доступный хост.
-#
-# Лимиты CPU/RAM: cpus / mem_limit. crud-app ждёт healthy postgres и старт additional-app.
+# Если с ВМ приложений видно connection refused на порт БД — на узле Postgres должен слушать сеть
+# (listen_addresses, pg_hba) или в ТЗ указан другой хост/порт; локальный контейнер Postgres здесь не предусмотрен.
 
 services:
-  postgresdb:
-    image: postgres:15-alpine
-    container_name: lab2_postgres
-    restart: unless-stopped
-    command: ["postgres", "-c", "max_connections=1000"]
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
-      POSTGRES_DB: ${POSTGRES_DB:-lab2_db}
-    ports:
-      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   additional-app:
     image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
     container_name: lab2_additional_app
@@ -49,13 +29,10 @@ services:
       - "${APP_PUBLISH_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      # Если задать SPRING_DATASOURCE_URL в .env — используется он (как в локальном .env с hl3).
-      # Иначе строка JDBC из DBHOST/POSTGRES_DB (имя БД = POSTGRES_DB в compose, без вложенного ${…}).
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DBHOST:-postgresdb}:${DBPORT:-5432}/${POSTGRES_DB:-lab2_db}?currentSchema=${SCHEMANAME:-public}}
-      DBHOST: ${DBHOST:-postgresdb}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DBHOST:-hl12.zil}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}}
+      DBHOST: ${DBHOST:-hl12.zil}
       DBPORT: ${DBPORT:-5432}
-      # Совпадает с именем БД в контейнере Postgres (POSTGRES_DB), если не задан полный SPRING_DATASOURCE_URL.
-      DBNAME: ${POSTGRES_DB:-lab2_db}
+      DBNAME: ${DBNAME:-lab2_db}
       SCHEMANAME: ${SCHEMANAME:-public}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
@@ -65,12 +42,7 @@ services:
       SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:-60}
       ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
     depends_on:
-      postgresdb:
-        condition: service_healthy
       additional-app:
         condition: service_started
     cpus: "${APP_CPU_LIMIT:-1.50}"
     mem_limit: "${APP_MEMORY_LIMIT:-1536m}"
-
-volumes:
-  postgres_data:
