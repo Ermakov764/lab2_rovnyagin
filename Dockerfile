@@ -5,7 +5,9 @@ WORKDIR /app
 
 COPY gradle gradle
 COPY gradlew build.gradle settings.gradle ./
-# Модуль нужен Gradle (settings.gradle включает :additional-service)
+# Модули из settings.gradle (иначе ./gradlew dependencies падает на «projectdirectory does not exist»)
+COPY shared/build.gradle shared/build.gradle
+COPY shared/src shared/src
 COPY additional-service/build.gradle additional-service/build.gradle
 COPY additional-service/src additional-service/src
 # Отдельный слой: тянет Gradle wrapper + Maven-зависимости (кэш переживает пересборки)

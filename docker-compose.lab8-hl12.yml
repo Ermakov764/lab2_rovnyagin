@@ -28,7 +28,8 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
       ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
       # JVM heap (иначе при k6 + тяжёлый GET сводки возможен OOM и «зависание» acceptor).
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
+      # Кавычки в .env обязательны для двух и более JVM-флагов.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms256m -Xmx1152m}
     depends_on:
       additional-app:
         condition: service_started
