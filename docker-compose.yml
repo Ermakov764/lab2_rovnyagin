@@ -1,48 +1,65 @@
-# ТЗ (лаб. 7–8): PostgreSQL на отдельном узле (например hl12); в этом файле только CRUD (:8080) и Additional (:8081).
-# На ВМ приложений: docker compose --env-file .env up -d
-# JDBC задаётся в .env: DBHOST, DBPORT, DBNAME, SCHEMANAME или целиком SPRING_DATASOURCE_URL.
-#
-# Если с ВМ приложений видно connection refused на порт БД — на узле Postgres должен слушать сеть
-# (listen_addresses, pg_hba) или в ТЗ указан другой хост/порт; локальный контейнер Postgres здесь не предусмотрен.
-
 services:
-  additional-app:
-    image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
-    container_name: lab2_additional_app
+  postgresdb:
+    image: postgres:15-alpine
+    container_name: lab2_postgres
     restart: unless-stopped
-    ports:
-      - "${ADDITIONAL_PUBLISH_PORT:-8081}:8081"
+    # Лаб. 7 (ТЗ): лимит соединений в контейнере PostgreSQL
+    command: ["postgres", "-c", "max_connections=1000"]
     environment:
-      SERVER_PORT: "8081"
-      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
-      MAIN_CRUD_HTTP_CONNECT_TIMEOUT_MS: ${MAIN_CRUD_HTTP_CONNECT_TIMEOUT_MS:-120000}
-      MAIN_CRUD_HTTP_READ_TIMEOUT_MS: ${MAIN_CRUD_HTTP_READ_TIMEOUT_MS:-180000}
-      JAVA_TOOL_OPTIONS: ${ADDITIONAL_JAVA_TOOL_OPTIONS:-}
-    cpus: "${ADDITIONAL_CPU_LIMIT:-0.5}"
-    mem_limit: "${ADDITIONAL_MEMORY_LIMIT:-512m}"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
+      POSTGRES_DB: ${POSTGRES_DB:-lab2_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  crud-app:
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lab2_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "15432:80"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+
+  app:
+    # Только образ из реестра (Docker Hub после docker login). Сборка: docker build -t "$DOCKER_IMAGE_APP" .
     image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
-    container_name: lab2_crud_app
+    container_name: lab2_app
     restart: unless-stopped
     ports:
-      - "${APP_PUBLISH_PORT:-8080}:8080"
+      - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DBHOST:-hl12.zil}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}}
-      DBHOST: ${DBHOST:-hl12.zil}
+      DBHOST: ${DBHOST:-postgresdb}
       DBPORT: ${DBPORT:-5432}
-      DBNAME: ${DBNAME:-lab2_db}
+      # Если DBNAME не задан — как имя БД в postgres-сервисе (POSTGRES_DB)
+      DBNAME: ${DBNAME:-${POSTGRES_DB:-lab2_db}}
       SCHEMANAME: ${SCHEMANAME:-public}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
-      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:-60}
-      ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
     depends_on:
-      additional-app:
-        condition: service_started
+      postgresdb:
+        condition: service_healthy
+    # Лимиты для обычного `docker compose up`: cpus/mem_limit → HostConfig (NanoCpus, Memory).
+    # Секция deploy.resources на части установок не применялась — из-за этого серия APP_CPU_LIMIT
+    # давала почти одинаковую нагрузку и «ломаные» графики. Не дублируйте deploy.limits.cpus
+    # и `cpus` — Compose запрещает два разных значения.
     cpus: "${APP_CPU_LIMIT:-1.50}"
     mem_limit: "${APP_MEMORY_LIMIT:-1536m}"
+
+volumes:
+  postgres_data:

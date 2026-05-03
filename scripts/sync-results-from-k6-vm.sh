@@ -5,14 +5,14 @@
 # Где: с ПК (не с hl03), где настроен SSH Host hl-k6 в ~/.ssh/config.
 # Типовой сценарий: ./scripts/sync-results-from-k6-vm.sh && ./scripts/lab8-plot-png.sh <TARGET_VUS>
 # -----------------------------------------------------------------------------
-# Зеркально подтянуть каталог k6/cpu-runs/ с k6-ВМ в локальный ./k6/cpu-runs
+# Зеркально подтянуть каталог results/ с k6-ВМ в локальный ./results
 # (те же JSON, что после прогонов k6; затем ./scripts/lab8-plot-png.sh <vus>).
 #
 # Нужен SSH-алиас hl-k6 в ~/.ssh/config (HostName hlssh.zil.digital, Port 2311, User hl).
 # Пароль вместо ключа: RSH_CMD='ssh -o BatchMode=no' ./scripts/sync-results-from-k6-vm.sh
 #
 # Переменные:
-#   K6_RESULTS_REMOTE  — источник rsync (по умолчанию hl-k6:~/ermakov_k6/k6/cpu-runs)
+#   K6_RESULTS_REMOTE  — источник rsync (по умолчанию hl-k6:~/ermakov_k6/results)
 #   RSH_CMD            — команда для rsync -e (по умолчанию ssh)
 #
 set -euo pipefail
@@ -20,14 +20,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Нормализуем один завершающий слэш у базы remote для копирования содержимого в ./k6/cpu-runs/
-REMOTE_BASE="${K6_RESULTS_REMOTE:-hl-k6:~/ermakov_k6/k6/cpu-runs}"
+REMOTE_BASE="${K6_RESULTS_REMOTE:-hl-k6:~/ermakov_k6/results}"
+# Нормализуем один завершающий слэш у базы remote для копирования содержимого в ./results/
 REMOTE="${REMOTE_BASE%/}/"
 RSH_CMD="${RSH_CMD:-ssh}"
 
-LOCAL_CPU_RUNS="${K6_CPU_RUNS_ROOT:-${ROOT}/k6/cpu-runs}"
-mkdir -p "${LOCAL_CPU_RUNS}"
+mkdir -p "${ROOT}/results"
 
-echo "==> rsync -avz --delete -e ${RSH_CMD} ${REMOTE} -> ${LOCAL_CPU_RUNS}/"
-rsync -avz --delete -e "${RSH_CMD}" "${REMOTE}" "${LOCAL_CPU_RUNS}/"
-echo "Готово: ${LOCAL_CPU_RUNS}/ (зеркало как на k6). Дальше: ./scripts/lab8-plot-png.sh <vus>"
+echo "==> rsync -avz --delete -e ${RSH_CMD} ${REMOTE} -> ${ROOT}/results/"
+rsync -avz --delete -e "${RSH_CMD}" "${REMOTE}" "${ROOT}/results/"
+echo "Готово: ${ROOT}/results/ (зеркало как на k6). Дальше: ./scripts/lab8-plot-png.sh <vus>"

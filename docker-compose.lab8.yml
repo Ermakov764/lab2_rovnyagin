@@ -1,0 +1,80 @@
+# Лаб. 8: основной CRUD + Additional service в одном compose; лимиты CPU для экспериментов (0.5 / 1.0).
+# Additional вызывает CRUD через HTTP (RestTemplate); join по названию фильма — в Java Additional.
+#
+# Локально (БД в том же compose):
+#   docker compose -f docker-compose.lab8.yml --env-file .env up -d --build
+#
+# С БД на hl12 — без локального Postgres: см. docker-compose.lab8-hl12.yml и переменные как в docker-compose.lab7-app.yml.
+services:
+  postgresdb:
+    image: postgres:15-alpine
+    container_name: lab8_postgres
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=1000"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
+      POSTGRES_DB: ${POSTGRES_DB:-lab2_db}
+    ports:
+      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
+    volumes:
+      - lab8_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crud-app:
+    image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
+    container_name: lab8_crud_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PUBLISH_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DBHOST:-postgresdb}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}
+      DBHOST: ${DBHOST:-postgresdb}
+      DBPORT: ${DBPORT:-5432}
+      DBNAME: ${DBNAME:-lab2_db}
+      SCHEMANAME: ${SCHEMANAME:-public}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
+      ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+      additional-app:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU_LIMIT:-0.5}"
+          memory: ${APP_MEMORY_LIMIT:-1536M}
+        reservations:
+          cpus: "${APP_CPU_RESERVATION:-0.25}"
+          memory: ${APP_MEMORY_RESERVATION:-256M}
+
+  additional-app:
+    image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
+    container_name: lab8_additional_app
+    restart: unless-stopped
+    ports:
+      - "${ADDITIONAL_PUBLISH_PORT:-8081}:8081"
+    environment:
+      SERVER_PORT: "8081"
+      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
+    deploy:
+      resources:
+        limits:
+          cpus: "${ADDITIONAL_CPU_LIMIT:-0.5}"
+          memory: ${ADDITIONAL_MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: "${ADDITIONAL_CPU_RESERVATION:-0.1}"
+          memory: ${ADDITIONAL_MEMORY_RESERVATION:-128M}
+
+volumes:
+  lab8_pg_data:

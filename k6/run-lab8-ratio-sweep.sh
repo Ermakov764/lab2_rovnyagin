@@ -2,14 +2,13 @@
 # LAB 8: три прогона с постоянными VU и смесиями POST/GET:
 #   POST /api/viewers (CRUD), GET /api/cinema/films/max-viewers-summary (CRUD), см. k6/cinema-lab8-constant.js.
 #
-# Результаты: k6/reports/lab8-summary-*.json → при RESULT_CPU — k6/cpu-runs/cpu-*
+# Результаты: k6/reports/lab8-summary-*.json → при RESULT_CPU — results/cpu-*
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-CPU_RUNS="${K6_CPU_RUNS_ROOT:-${ROOT}/k6/cpu-runs}"
-mkdir -p k6/reports "${CPU_RUNS}/cpu-0.5" "${CPU_RUNS}/cpu-1.0"
+mkdir -p k6/reports results/cpu-0.5 results/cpu-1.0
 
 BASE_MAIN="${BASE_URL_MAIN:-http://localhost:8080}"
 BASE_MAIN="${BASE_MAIN%/}"
@@ -60,7 +59,7 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
     echo "Ошибка: RESULT_CPU='${RESULT_CPU}' — для лаб. 8 ожидается 0.5 или 1.0 (или 1)" >&2
     exit 1
   fi
-  dest="${CPU_RUNS}/cpu-${label}"
+  dest="${ROOT}/results/cpu-${label}"
   mkdir -p "$dest"
   shopt -s nullglob
   rm -f "${dest}"/lab8-summary-*.json
@@ -75,7 +74,7 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
   if [[ "${LAB8_AUTO_PLOT:-0}" == "1" ]]; then
     plot_py="${ROOT}/k6/plot_lab6_from_results.py"
     mkdir -p "${ROOT}/png_k8"
-    python3 "$plot_py" "${CPU_RUNS}" -o "${ROOT}/png_k8" \
+    python3 "$plot_py" "${ROOT}/results" -o "${ROOT}/png_k8" \
       --vus "${TARGET_VUS}" \
       --summary-prefix lab8-summary \
       --title-tag "Лаб. 8 (POST viewers / GET summary)" \
@@ -84,5 +83,5 @@ if [[ -n "${RESULT_CPU:-}" ]]; then
       --get-legend "GET /api/cinema/films/max-viewers-summary (среднее, мс)"
   fi
 else
-  echo "Подсказка: RESULT_CPU=0.5|1.0 — копирование в k6/cpu-runs/cpu-<метка>/"
+  echo "Подсказка: RESULT_CPU=0.5|1.0 — копирование в results/cpu-<метка>/"
 fi

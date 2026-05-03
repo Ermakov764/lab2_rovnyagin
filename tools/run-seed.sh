@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LAB5: запуск seed_rest_data.py из каталога tools/.
+# LAB5: запуск seed_rest_data.py (как обёртка над k6/run-sweep.sh для единообразия).
 #
 # Без аргументов — подставляет значения из переменных окружения (или дефолты):
 #   BASE_URL   по умолчанию http://localhost:8080

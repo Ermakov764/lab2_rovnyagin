@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Графики «время отклика vs лимит CPU» по подпапкам cpu-* (лаб. 6 или лаб. 8).
-Три PNG — смеси 5/95, 50/50, 95/5; ось X — vCPU, ось Y — среднее POST/GET (мс).
+LAB6 (п. 10 ТЗ): три итоговых графика — по одному на нагрузку 5/95, 50/50, 95/5
+(вставка/чтение). На каждом: ось X — лимит CPU (0.5, 1.0, 1.5, 2 vCPU), ось Y —
+среднее время отклика (мс) при постоянных VU; две кривые — POST и GET.
 
-Каждый summary JSON должен содержать объект lab6_meta (пишет k6 при handleSummary:
-лаб. 8 — cinema-lab8-constant.js, см. run-lab8-ratio-sweep.sh). Без него скрипт завершится с ошибкой.
+Каждый JSON должен содержать lab6_meta (пишет cinema-lab6-constant.js при запуске
+через run-lab6-ratio-sweep.sh). Иначе скрипт завершится с ошибкой.
 
 Одна серия прогонов: одинаковые TARGET_VUS в именах файлов и одинаковое ядро
-lab6_meta между всеми k6/cpu-runs/cpu-* и всеми смесиями — иначе ошибка.
+lab6_meta между всеми results/cpu-* и всеми смесиями — иначе ошибка.
 
 Структура входа:
-  k6/cpu-runs/
+  <results>/
     cpu-0.5/
       lab6-summary-post05-get95-vus-30.json
       ...
     cpu-1.0/ ...
 
-Выход (по умолчанию <out-dir> или <каталог>/plots):
+Выход (по умолчанию <results>/plots/):
   lab6-vs-cpu-mix-5-95.png
   lab6-vs-cpu-mix-50-50.png
   lab6-vs-cpu-mix-95-5.png
@@ -153,9 +154,9 @@ def parse_lab6_meta(data: dict, path: Path) -> dict:
     raw = data.get("lab6_meta")
     if not isinstance(raw, dict):
         die(
-            f"{path}: нет объекта lab6_meta — переснимите прогоны "
-            f"(например k6/run-lab8-ratio-sweep.sh с актуальным cinema-lab8-constant.js), "
-            f"чтобы summary содержал поле lab6_meta."
+            f"{path}: нет объекта lab6_meta — переснимите прогоны через "
+            f"k6/run-lab6-ratio-sweep.sh (актуальный cinema-lab6-constant.js) или один раз: "
+            f"python3 k6/inject-lab6-meta-into-results.py <results> --base-url … --duration … --k6-route …"
         )
     try:
         tv = int(raw["target_vus"])
@@ -336,7 +337,7 @@ def main() -> None:
         "results",
         type=Path,
         nargs="?",
-        default=Path("k6/cpu-runs"),
+        default=Path("results"),
         help="Каталог с подкаталогами cpu-0.5, cpu-1.0, …",
     )
     p.add_argument(
@@ -344,7 +345,7 @@ def main() -> None:
         "--out-dir",
         type=Path,
         default=None,
-        help="Куда писать PNG (по умолчанию <каталог_cpu>/plots)",
+        help="Куда писать PNG (по умолчанию <results>/plots)",
     )
     p.add_argument(
         "--vus",
@@ -423,7 +424,7 @@ def main() -> None:
     if all_issues:
         for msg in all_issues:
             print(f"Ошибка: {msg}", file=sys.stderr)
-        die("Исправьте k6/cpu-runs/cpu-* или переснимите прогоны.")
+        die("Исправьте results/cpu-* или переснимите прогоны.")
 
     for series, meta, file_slug, mix_label in to_plot:
         plot_mix(
