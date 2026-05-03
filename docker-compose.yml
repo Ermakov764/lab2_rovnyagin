@@ -49,10 +49,13 @@ services:
       - "${APP_PUBLISH_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${DBHOST:-postgresdb}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}
+      # Если задать SPRING_DATASOURCE_URL в .env — используется он (как в локальном .env с hl3).
+      # Иначе строка JDBC из DBHOST/POSTGRES_DB (имя БД = POSTGRES_DB в compose, без вложенного ${…}).
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DBHOST:-postgresdb}:${DBPORT:-5432}/${POSTGRES_DB:-lab2_db}?currentSchema=${SCHEMANAME:-public}}
       DBHOST: ${DBHOST:-postgresdb}
       DBPORT: ${DBPORT:-5432}
-      DBNAME: ${DBNAME:-${POSTGRES_DB:-lab2_db}}
+      # Совпадает с именем БД в контейнере Postgres (POSTGRES_DB), если не задан полный SPRING_DATASOURCE_URL.
+      DBNAME: ${POSTGRES_DB:-lab2_db}
       SCHEMANAME: ${SCHEMANAME:-public}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
