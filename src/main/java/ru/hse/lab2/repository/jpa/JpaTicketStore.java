@@ -27,6 +27,11 @@ public class JpaTicketStore implements TicketStore {
     }
 
     @Override
+    public List<Ticket> findByFilmId(Long filmId) {
+        return ticketRepository.findByFilm_Id(filmId);
+    }
+
+    @Override
     public Optional<Ticket> findById(Long id) {
         return ticketRepository.findById(id);
     }

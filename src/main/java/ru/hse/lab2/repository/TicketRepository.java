@@ -23,6 +23,9 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     
     void deleteByViewer_Id(Long viewerId);
 
+    List<Ticket> findByFilm_Id(Long filmId);
+
+    /** Дневные агрегаты для {@code TicketService#getMaxViewersPerDayByFilm} (публичный GET /api/tickets/analytics/...). */
     @Query("""
         SELECT t.sessionDate, COUNT(DISTINCT t.viewer.id)
         FROM Ticket t
@@ -42,8 +45,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Object[]> findTopFilmByDate(@Param("date") LocalDate date);
 
     /**
-     * PostgreSQL: первые {@code maxRows} фильмов по id среди имеющих билеты — через таблицу {@code films} + EXISTS,
-     * без DISTINCT по всей {@code tickets} (иначе многомиллионная таблица → seq scan/hash → время/память и reset TCP).
+     * Internal legacy: один «лучший» день на фильм уже в SQL (LATERAL + LIMIT 1).
+     * Сводка для лаб. 8 в Additional собирается без этого запроса — публичные / внутренние эндпоинты
+     * «все дни по фильму» + список фильмов (см. Additional-сервис).
+     * <p>PostgreSQL: первые {@code maxRows} фильмов по id — через {@code films} + EXISTS,
+     * без DISTINCT по всей {@code tickets} (иначе seq scan/hash на огромной таблице).
      */
     @Query(value = """
         SELECT pick.fid, pick.ftitle, stats.d AS d, stats.vc AS vc

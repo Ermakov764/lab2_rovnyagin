@@ -27,9 +27,10 @@
 #   PGADMIN_SSH_HOST   — по умолчанию как SSH_HOST
 #   PGADMIN_SSH_USER   — по умолчанию как SSH_USER
 #
-#   AUTO_START_REMOTE_APP — 0 чтобы не трогать Docker на ВМ (по умолчанию 1: лаб. 7 app)
+#   AUTO_START_REMOTE_APP — 0 чтобы не трогать Docker на ВМ (по умолчанию 1: docker-compose.yml)
 #   REMOTE_REPO_SUBDIR    — каталог репозитория относительно $HOME на ВМ (по умолчанию lab2_rovnyagin)
-#   LAB7_COMPOSE_FILE     — compose только приложения (по умолчанию docker-compose.lab7-app.yml)
+#   REMOTE_COMPOSE_FILE   — compose на ВМ (по умолчанию docker-compose.yml; БД снаружи)
+#   REMOTE_COMPOSE_PRIMARY_SERVICE — сервис для проверки «уже Up» (по умолчанию crud-app)
 #
 # Доп. аргументы передаются в ssh персональной ВМ. При -f туннель pgAdmin не стартует
 # (нужен второй терминал или запуск без -f); см. сообщение скрипта.
@@ -70,18 +71,19 @@ PGADMIN_REMOTE="${PGADMIN_SSH_USER}@${PGADMIN_SSH_HOST}"
 
 AUTO_START_REMOTE_APP="${AUTO_START_REMOTE_APP:-1}"
 REMOTE_REPO_SUBDIR="${REMOTE_REPO_SUBDIR:-lab2_rovnyagin}"
-LAB7_COMPOSE_FILE="${LAB7_COMPOSE_FILE:-docker-compose.lab7-app.yml}"
+REMOTE_COMPOSE_FILE="${REMOTE_COMPOSE_FILE:-docker-compose.yml}"
+REMOTE_COMPOSE_PRIMARY_SERVICE="${REMOTE_COMPOSE_PRIMARY_SERVICE:-crud-app}"
 
 if [[ "${AUTO_START_REMOTE_APP}" != "0" ]]; then
-  echo "Персональная ВМ: проверка сервиса app (${LAB7_COMPOSE_FILE})..."
+  echo "Персональная ВМ: проверка ${REMOTE_COMPOSE_PRIMARY_SERVICE} (${REMOTE_COMPOSE_FILE})..."
   if ! ssh -p "${SSH_PORT}" "${REMOTE}" bash -s <<EOF
 set -euo pipefail
 cd "\${HOME}/${REMOTE_REPO_SUBDIR}"
-if docker compose -f '${LAB7_COMPOSE_FILE}' ps app 2>/dev/null | grep -q 'Up'; then
-  echo "Контейнер app уже запущен."
+if docker compose -f '${REMOTE_COMPOSE_FILE}' ps '${REMOTE_COMPOSE_PRIMARY_SERVICE}' 2>/dev/null | grep -q 'Up'; then
+  echo "Контейнер ${REMOTE_COMPOSE_PRIMARY_SERVICE} уже запущен."
 else
-  echo "Запуск: docker compose -f '${LAB7_COMPOSE_FILE}' --env-file .env up -d"
-  docker compose -f '${LAB7_COMPOSE_FILE}' --env-file .env up -d
+  echo "Запуск: docker compose -f '${REMOTE_COMPOSE_FILE}' --env-file .env up -d"
+  docker compose -f '${REMOTE_COMPOSE_FILE}' --env-file .env up -d
 fi
 EOF
   then

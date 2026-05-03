@@ -21,6 +21,17 @@ import ru.hse.lab2.service.TicketService;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Ресурс билетов под {@code /api/tickets}.
+ *
+ * <p><b>Важно для лаб. 8 (микросервис Additional):</b>
+ * <ul>
+ *   <li>{@code GET /api/tickets} — все билеты (как раньше).</li>
+ *   <li>{@code GET /api/tickets?filmId=x} — только билеты фильма {@code x}; «простой» фильтр без join-аналитики.</li>
+ * </ul>
+ * <p>Микросервис Additional для отчётов вызывает {@code GET /api/tickets} без параметров и строит {@code Map<filmId, билеты>} в памяти.</p>
+ * Отдельно остаются «тяжёлые» пути {@code /api/tickets/analytics/...} у этого же контроллера — это не то, что зовёт Additional.
+ */
 @RestController
 @RequestMapping("/api/tickets")
 public class TicketRestController {
@@ -31,9 +42,13 @@ public class TicketRestController {
         this.ticketService = ticketService;
     }
 
+    /** Билеты; при {@code filmId} — только по фильму (простой CRUD-фильтр для микросервиса, без готовой аналитики). */
     @GetMapping
-    public List<TicketDto> getAll() {
-        return ticketService.getAll();
+    public List<TicketDto> getAll(@RequestParam(required = false) Long filmId) {
+        if (filmId == null) {
+            return ticketService.getAll();
+        }
+        return ticketService.getAllByFilmId(filmId);
     }
 
     @GetMapping("/{id}")

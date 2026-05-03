@@ -3,12 +3,18 @@ package ru.hse.lab2.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.hse.lab2.api.dto.FilmMaxViewerRawRowDto;
+import ru.hse.lab.shared.analytics.TopFilmsReportLimits;
 import ru.hse.lab2.exception.ValidationException;
 import ru.hse.lab2.service.port.TicketStore;
 
-import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Данные для <b>internal</b> {@code GET /api/internal/cinema/film-max-viewer-rows} (агрегат уже в SQL).
+ *
+ * <p>Микросервис Additional в лаб. 8 этот сервис <b>не использует</b>: там только публичные
+ * {@code /api/films} и {@code /api/tickets?filmId=}.
+ */
 @Service
 public class TicketAnalyticsReadService {
 
@@ -18,11 +24,10 @@ public class TicketAnalyticsReadService {
         this.ticketStore = ticketStore;
     }
 
+    /** Internal legacy: агрегат с «лучшим днём» уже в репозитории ({@code findAllFilmDailyViewerAggregates}). */
     @Transactional(readOnly = true)
     public List<FilmMaxViewerRawRowDto> filmMaxViewerRawRows(int limit) {
-        if (limit < 1 || limit > 50_000) {
-            throw new ValidationException("limit must be between 1 and 50000");
-        }
+        TopFilmsReportLimits.requireInRange(limit);
         return ticketStore.findAllFilmDailyViewerAggregates(limit).stream()
                 .map(row -> new FilmMaxViewerRawRowDto(
                         ((Number) row[0]).longValue(),
@@ -37,7 +42,7 @@ public class TicketAnalyticsReadService {
         if (raw == null) {
             throw new ValidationException("Analytics row has null date");
         }
-        if (raw instanceof LocalDate ld) {
+        if (raw instanceof java.time.LocalDate ld) {
             return ld.toString();
         }
         if (raw instanceof java.sql.Date d) {

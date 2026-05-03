@@ -16,6 +16,10 @@ import ru.hse.lab2.service.FilmService;
 
 import java.util.List;
 
+/**
+ * Каталог фильмов: {@code GET /api/films} отдаёт все записи (id, title, …).
+ * Микросервис Additional использует этот список для обхода фильмов и сопоставления названий (лаб. 8).
+ */
 @RestController
 @RequestMapping("/api/films")
 public class FilmRestController {

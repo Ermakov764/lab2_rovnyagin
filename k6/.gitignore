@@ -1,6 +1,2 @@
 __pycache__/
 *.pyc
-
-# LAB6: summary JSON (zil-стиль имён); папки держим в git через .gitkeep
-reports-lab6-pc/*.json
-reports-lab6-s2s/*.json

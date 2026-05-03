@@ -1,8 +1,8 @@
 package ru.hse.lab2.api.dto;
 
 /**
- * Ответ только для GET /api/internal/cinema/film-max-viewer-rows —
- * сырая строка агрегата из БД (без бизнес-имени «Summary» доп. сервиса).
+ * Строка «фильм — день — число зрителей» для internal-ответов: legacy {@code film-max-viewer-rows}
+ * и промежуточные ряды при сборке сводки в Additional.
  */
 public record FilmMaxViewerRawRowDto(
         Long filmId,

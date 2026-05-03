@@ -1,65 +1,47 @@
+# CRUD (:8080) + Additional (:8081). PostgreSQL в этом compose не поднимается — укажите внешнюю БД в .env
+# (DBHOST, DBPORT, DBNAME, SCHEMANAME, учётные записи; при необходимости SPRING_DATASOURCE_URL).
+#
+# Пример:
+#   docker compose --env-file .env up -d
+#   docker compose logs -f crud-app
+#
+# Лимиты CPU/RAM: cpus / mem_limit (без Swarm) — как в ТЗ лаб. 6; ADDITIONAL_* для второго сервиса.
+# crud-app стартует после additional-app (прокси на :8080 ходит на Additional).
+
 services:
-  postgresdb:
-    image: postgres:15-alpine
-    container_name: lab2_postgres
+  additional-app:
+    image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
+    container_name: lab2_additional_app
     restart: unless-stopped
-    # Лаб. 7 (ТЗ): лимит соединений в контейнере PostgreSQL
-    command: ["postgres", "-c", "max_connections=1000"]
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lab2_password}
-      POSTGRES_DB: ${POSTGRES_DB:-lab2_db}
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: lab2_pgadmin
-    restart: unless-stopped
+      - "${ADDITIONAL_PUBLISH_PORT:-8081}:8081"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin_password
-    ports:
-      - "15432:80"
-    depends_on:
-      postgresdb:
-        condition: service_healthy
+      SERVER_PORT: "8081"
+      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
+    cpus: "${ADDITIONAL_CPU_LIMIT:-0.5}"
+    mem_limit: "${ADDITIONAL_MEMORY_LIMIT:-512m}"
 
-  app:
-    # Только образ из реестра (Docker Hub после docker login). Сборка: docker build -t "$DOCKER_IMAGE_APP" .
+  crud-app:
     image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
-    container_name: lab2_app
+    container_name: lab2_crud_app
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PUBLISH_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DBHOST: ${DBHOST:-postgresdb}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DBHOST:-hl12.zil}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}
+      DBHOST: ${DBHOST:-hl12.zil}
       DBPORT: ${DBPORT:-5432}
-      # Если DBNAME не задан — как имя БД в postgres-сервисе (POSTGRES_DB)
-      DBNAME: ${DBNAME:-${POSTGRES_DB:-lab2_db}}
+      DBNAME: ${DBNAME:-lab2_db}
       SCHEMANAME: ${SCHEMANAME:-public}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-lab2_password}
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-200}
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
+      ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
     depends_on:
-      postgresdb:
-        condition: service_healthy
-    # Лимиты для обычного `docker compose up`: cpus/mem_limit → HostConfig (NanoCpus, Memory).
-    # Секция deploy.resources на части установок не применялась — из-за этого серия APP_CPU_LIMIT
-    # давала почти одинаковую нагрузку и «ломаные» графики. Не дублируйте deploy.limits.cpus
-    # и `cpus` — Compose запрещает два разных значения.
+      additional-app:
+        condition: service_started
     cpus: "${APP_CPU_LIMIT:-1.50}"
     mem_limit: "${APP_MEMORY_LIMIT:-1536m}"
-
-volumes:
-  postgres_data:

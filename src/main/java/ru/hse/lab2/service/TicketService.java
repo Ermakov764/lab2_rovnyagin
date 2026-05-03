@@ -46,6 +46,13 @@ public class TicketService {
     }
 
     @Transactional(readOnly = true)
+    public List<TicketDto> getAllByFilmId(long filmId) {
+        return ticketStore.findByFilmId(filmId).stream()
+                .map(TicketMapper::toDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public TicketDto getById(Long id) {
         return TicketMapper.toDto(getEntityById(id));
     }

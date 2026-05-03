@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'ru.hse'
+version = '1.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}

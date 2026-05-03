@@ -34,6 +34,13 @@ public class InMemoryTicketStore implements TicketStore {
     }
 
     @Override
+    public synchronized List<Ticket> findByFilmId(Long filmId) {
+        return tickets.values().stream()
+                .filter(t -> filmId.equals(t.getFilm().getId()))
+                .toList();
+    }
+
+    @Override
     public synchronized Optional<Ticket> findById(Long id) {
         return Optional.ofNullable(tickets.get(id));
     }

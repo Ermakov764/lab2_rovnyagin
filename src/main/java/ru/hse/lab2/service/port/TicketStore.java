@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface TicketStore {
     List<Ticket> findAll();
 
+    List<Ticket> findByFilmId(Long filmId);
+
     Optional<Ticket> findById(Long id);
 
     Ticket save(Ticket ticket);
