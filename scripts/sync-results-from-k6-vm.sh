@@ -29,4 +29,4 @@ mkdir -p "${ROOT}/results"
 
 echo "==> rsync -avz --delete -e ${RSH_CMD} ${REMOTE} -> ${ROOT}/results/"
 rsync -avz --delete -e "${RSH_CMD}" "${REMOTE}" "${ROOT}/results/"
-echo "Готово: ${ROOT}/results/ (зеркало как на k6). Дальше: ./scripts/lab8-plot-png.sh <vus>"
+echo "Готово: ${ROOT}/results/ (зеркало как на k6). Дальше: ./scripts/lab8-plot-png.sh <vus> → k6/png_k6/"

@@ -16,6 +16,10 @@ LAB5: сидирование и точечная очистка Cinema REST (req
   python3 tools/seed_rest_data.py --endpoint viewers --clear  # билеты + зрители
   python3 tools/seed_rest_data.py --endpoint tickets --clear  # билеты + зрители (как viewers)
   python3 tools/seed_rest_data.py --endpoint all --clear      # всё
+
+Лаб. 8 (k6): перед серией прогонов часто достаточно очистить зрителей и билеты (фильмы остаются):
+  python3 tools/seed_rest_data.py --base-url http://<host>:8080 --endpoint viewers --clear
+  или: LAB8_CLEAR_VIEWERS_BEFORE=1 ./k6/run-lab8-ratio-sweep.sh
 """
 from __future__ import annotations
 

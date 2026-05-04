@@ -6,7 +6,7 @@
 
 **Лаб. 7–8** (тексты **`ТЗ_7лаба.txt`**, **`ТЗ_8лаба.txt`**) — **одна логическая лабораторная** в README:  
 - **Часть 7 — БД на отдельном узле:** **PostgreSQL** на **`hl12.zil`**, приложение на другой ВМ, **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, **`max_connections=1000`**, **`docker-compose.lab7-*.yml`**, туннели к **pgAdmin**.  
-- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`** (локальный Postgres) или **`docker-compose.lab8-hl12.yml`** (БД на hl12, как лаб. 7); два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`png_k8/`**.
+- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`** (локальный Postgres) или **`docker-compose.lab8-hl12.yml`** (БД на hl12, как лаб. 7); два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`k6/png_k6/`**.
 
 Раздел **`## Лабораторная работа №7–8`** ниже объединяет обе части (**сначала лаб. 7, затем лаб. 8**).
 
@@ -205,7 +205,7 @@ python3 k6/plot_k6_reports.py --lab6 --title-suffix "ПК → сервер" k6/r
 - Java 25
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
-- **Лаб. 6 (сдача):** доступ по **SSH** к персональной ВМ курса; на ПК — **Git**, клиент **SSH**; для сценария с общей k6-ВМ — **`rsync`**, **`ssh-copy-id`** (см. **`k6/remote-k6-sync-and-run.sh`**); **Python 3** + **matplotlib** для **`k6/plot_lab6_from_results.py`**
+- **Лаб. 6 (сдача):** доступ по **SSH** к персональной ВМ курса; на ПК — **Git**, клиент **SSH**; для сценария с общей k6-ВМ — **`rsync`**, **`ssh-copy-id`** (см. **`k6/remote-k6-sync-and-run.sh`**); **Python 3** + **matplotlib** для **`k6/plot_k6_cpu_results.py`**
 - **Лаб. 7–8:** SSH к **персональной ВМ** и при необходимости к **серверу БД** (часто **2312**); **`docker-compose.lab7-app.yml`** / **`docker-compose.lab8.yml`**; см. раздел **«Лабораторная работа №7–8»**
 - **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
 - **Лаб. 5:** Python 3.10+; зависимости сидера — `pip install -r tools/requirements-seed.txt` **или** запуск **`./tools/run-seed.sh`** (на Linux при ограничении системного `pip`, PEP 668, скрипт создаёт **`tools/.venv`** и ставит пакеты туда)
@@ -571,7 +571,7 @@ lab2_rovnyagin/
 ├── additional-service/           # Лаб. 8: второй Spring Boot (RestTemplate → CRUD)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
 ├── tools/              # Лаб. 5: seed_rest_data.py, run-seed.sh, requirements-seed.txt
-├── k6/                 # Лаб. 4/6/8: cinema-*.js, run-sweep.sh, run-lab6-ratio-sweep.sh, run-lab8-ratio-sweep.sh, plot_lab6_from_results.py
+├── k6/                 # Лаб. 8: cinema-lab8-constant.js, run-lab8-ratio-sweep.sh, plot-lab8-from-results.sh, plot_k6_cpu_results.py; артефакты: k6/reports/, k6/png_k6/ (PNG лаб. 8)
 ├── scripts/            # Лаб. 6: ssh-tunnel-personal-vm.sh
 └── README.md                       # Этот файл
 ```
@@ -604,7 +604,7 @@ lab2_rovnyagin/
 |---|---|
 | **Зачем** | Три прогона подряд с **постоянными** VU и смесью POST/GET (**5/95, 50/50, 95/5**) по сценарию **`k6/cinema-lab6-constant.js`** (как zil **`LAB6_CONST`**: в каждой итерации случайно POST или GET с вероятностью **`POST_SHARE`**). |
 | **Где** | Из **корня репозитория**; вызывает **`k6 run`** локально (**k6** должен быть в **`PATH`**). |
-| **Переменные** | **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`**: **`pc-to-server`** → JSON в **`k6/reports-lab6-pc/`** (префикс **`pc_`**), **`server-to-server`** → **`k6/reports-lab6-s2s/`** (**`s2s_`**). Имена как в типовом zil/k6: **`pc_cpu10_mix50.json`** (**cpu05|10|15|20** = 0.5…2 vCPU, **mix05|50|95** = смеси). Если задан **`RESULT_CPU`**, копии с алиасами имён — в **`results/cpu-*`** для **`plot_lab6_from_results.py`**. **`LAB6_AUTO_PLOT_PANELS=1`** — попытка вызвать **`plot_k6_reports.py`** (нужны уже все 12 JSON в папке). |
+| **Переменные** | **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`**: **`pc-to-server`** → JSON в **`k6/reports-lab6-pc/`** (префикс **`pc_`**), **`server-to-server`** → **`k6/reports-lab6-s2s/`** (**`s2s_`**). Имена как в типовом zil/k6: **`pc_cpu10_mix50.json`** (**cpu05|10|15|20** = 0.5…2 vCPU, **mix05|50|95** = смеси). Если задан **`RESULT_CPU`**, копии с алиасами имён — в **`results/cpu-*`** для **`plot_k6_cpu_results.py`**. **`LAB6_AUTO_PLOT_PANELS=1`** — попытка вызвать **`plot_k6_reports.py`** (нужны уже все 12 JSON в папке). |
 | **Результат** | Без **`RESULT_CPU`**: черновик **`k6/reports/lab6-summary-*.json`**. С **`RESULT_CPU`**: три файла в **`reports-lab6-pc`** или **`reports-lab6-s2s`** + три **`lab6-summary-*`** в **`results/cpu-*`**. |
 | **Создаёт каталоги** | **`results/cpu-0.5`** … **`cpu-2`** для удобства дальнейшей укладки отчётов. |
 
@@ -622,7 +622,7 @@ lab2_rovnyagin/
 
 | | |
 |---|---|
-| **Зачем** | На **персональной ВМ** с Docker и клоном репо: для каждого значения **`APP_CPU_LIMIT`** из списка **`LAB6_CPUS`** (по умолчанию **0.5 1.0 1.5 2**) — правка **`.env`**, **`docker compose up -d --force-recreate app`**, ожидание HTTP, вызов **`remote-k6-sync-and-run.sh`** с соответствующим **`RESULT_CPU`**, затем **один раз** забирает **`results/`** с k6-ВМ (**`scp`**) и строит PNG в **`png_k6/`** через **`plot_lab6_from_results.py`**. |
+| **Зачем** | На **персональной ВМ** с Docker и клоном репо: для каждого значения **`APP_CPU_LIMIT`** из списка **`LAB6_CPUS`** (по умолчанию **0.5 1.0 1.5 2**) — правка **`.env`**, **`docker compose up -d --force-recreate app`**, ожидание HTTP, вызов **`remote-k6-sync-and-run.sh`** с соответствующим **`RESULT_CPU`**, затем **один раз** забирает **`results/`** с k6-ВМ (**`scp`**) и строит PNG в **`png_k6/`** через **`plot_k6_cpu_results.py`**. |
 | **Требования** | Docker Compose, **curl**, **rsync**, **scp**, **python3** + **matplotlib**, SSH-ключ на k6 (**порт по умолчанию 2311**). |
 | **Обязательные env** | **`K6_SSH_HOST`**, **`BASE_URL`** (доступен **с k6-ВМ**). Остальное — как у **`remote-k6-sync-and-run.sh`**. **`LOCAL_APP_URL`** — ожидание готовности приложения **на этой же ВМ** (по умолчанию **`http://127.0.0.1:8080`**). |
 
@@ -641,7 +641,7 @@ lab2_rovnyagin/
 |------|------|
 | **`k6/plot_avg_vs_vus.py`** | Строит график по отчётам лаб. 4 (**`summary-vus-*.json`**). Вызывается из **`run-sweep.sh`**. |
 | **`k6/plot_k6_reports.py`** | **Лаб. 6, вид как zil/k6:** один PNG **`lab6_latency_vs_cpu.png`** — **три панели** (смеси 5/95, 50/50, 95/5), ось **X** = CPU. Вход: все **`pc_cpu05_mix05.json` … `s2s_cpu20_mix95.json`** в **`k6/reports-lab6-pc/`** или **`reports-lab6-s2s/`**. Команда: **`python3 k6/plot_k6_reports.py --lab6 k6/reports-lab6-pc`**. Метрики **`post_ms` / `get_ms`** (старые JSON с **`k6_*`** тоже читаются). |
-| **`k6/plot_lab6_from_results.py`** | Строит **три отдельных** PNG (**`lab6-vs-cpu-mix-*.png`**) из **`results/cpu-*`**. Условия те же (**`lab6_meta`**, **`--vus`** при смешанных прогонах). |
+| **`k6/plot_k6_cpu_results.py`** | Строит **три отдельных** PNG (**`lab6-vs-cpu-mix-*.png`**) из **`results/cpu-*`**. Условия те же (**`lab6_meta`**, **`--vus`** при смешанных прогонах). |
 | **`tools/seed_rest_data.py`** | Реализация сидирования; вызывается из **`run-seed.sh`**. |
 
 ## Структура базы данных
@@ -865,7 +865,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 - **Сервер на сервер**: на машине, откуда виден API (часто та же ВМ или общая k6-ВМ),  
   `export BASE_URL=http://127.0.0.1:8080` (или **`http://<IP_приложения>:8080`**) и снова **`./k6/run-lab6-ratio-sweep.sh`**.  
 - Серия по CPU: на ВМ в **`.env`** меняете **`APP_CPU_LIMIT`** (0.5, 1.0, 1.5, 2), **`docker compose up -d --force-recreate app`**, после каждого — sweep с **`RESULT_CPU=0.5`** … **`2`**.  
-- Графики: см. подраздел **«Полный порядок: hl03 + k6-ВМ + ПК»** и **`scripts/lab6-sync-png-from-k6-vm.sh`**; вручную: **`python3 k6/plot_lab6_from_results.py results -o png_k6 --vus <N>`** (нужен **matplotlib**).
+- Графики: см. подраздел **«Полный порядок: hl03 + k6-ВМ + ПК»** и **`scripts/lab6-sync-png-from-k6-vm.sh`**; вручную: **`python3 k6/plot_k6_cpu_results.py results -o png_k6 --vus <N>`** (нужен **matplotlib**).
 
 **D. Локально на ПК без ВМ (только разработка)**  
 ```bash
@@ -1012,33 +1012,31 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | **7** | Явно CPU/RAM контейнера приложения | У сервиса **`app`**: **`cpus`** и **`mem_limit`** из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`** (лимиты без Swarm; см. **`docker inspect`** ниже). |
 | **8** | БД и потоки Tomcat через **переменные окружения** (`server.tomcat.max-threads` в ТЗ) | В Compose: **`SPRING_DATASOURCE_*`**, **`SERVER_TOMCAT_THREADS_MAX`** → свойство **`server.tomcat.threads.max`** (актуальный аналог `max-threads`). См. [Spring: внешняя конфигурация](https://docs.spring.io/spring-boot/reference/features/external-config.html), [Baeldung: env → properties](https://www.baeldung.com/spring-boot-properties-env-variables). |
 | **9** | Отключение `spring.jpa.show-sql` через переменную | **`SPRING_JPA_SHOW_SQL`** в Compose и плейсхолдер в **`application.properties`**. |
-| **10** | График: время отклика vs CPU (шаг **0.5**), **const VU**, смеси **5/95, 50/50, 95/5**; опыты **с ПК на сервер** и **с сервера на сервер** | **`k6/cinema-lab6-constant.js`**, **`k6/run-lab6-ratio-sweep.sh`**, папки **`results/cpu-*`**, **`k6/plot_lab6_from_results.py`** → PNG. Порядок «приложение + k6-ВМ + ПК» — **«Полный порядок: hl03 + k6-ВМ + ПК»**; сценарии k6 — **«П. 10 ТЗ: два сценария прогона»**. |
+| **10** | График: время отклика vs CPU (шаг **0.5**), **const VU**, смеси **5/95, 50/50, 95/5**; опыты **с ПК на сервер** и **с сервера на сервер** | **`k6/cinema-lab6-constant.js`**, **`k6/run-lab6-ratio-sweep.sh`**, папки **`results/cpu-*`**, **`k6/plot_k6_cpu_results.py`** → PNG. Порядок «приложение + k6-ВМ + ПК» — **«Полный порядок: hl03 + k6-ВМ + ПК»**; сценарии k6 — **«П. 10 ТЗ: два сценария прогона»**. |
 
 ### Как в коде и скриптах выполнена лабораторная 6
 
 - **Контейнеризация и конфигурация:** в **`docker-compose.yml`** у сервиса **`app`** заданы лимиты **CPU/RAM** (**`cpus`**, **`mem_limit`** — так они гарантированно применяются при **`docker compose up`**), все чувствительные параметры приложения и БД пробрасываются через **`.env`** / **`environment`** (JDBC, Tomcat, JPA, образ Hub).
 - **Доступ с ПК к приложению на ВМ:** отдельный скрипт **`scripts/ssh-tunnel-personal-vm.sh`** повторяет требование ТЗ **`ssh -L 8080:localhost:8080`** (с учётом нестандартного SSH-порта курса).
-- **Нагрузка по ТЗ п. 10:** **`k6/cinema-lab6-constant.js`** — **фиксированное число VU** и **`duration`**; в каждой итерации с вероятностью **`POST_SHARE`** выполняется **POST** `/api/films`, иначе **GET** аналитики (та же идея, что **`load.js`** одногруппницы с **`LAB6_CONST=1`**). **`k6/run-lab6-ratio-sweep.sh`** три раза подряд меняет **`POST_SHARE`** (5/95, 50/50, 95/5). Дальше — **`plot_k6_reports.py --lab6`** или **`plot_lab6_from_results.py`** по **`results/cpu-*`**.
+- **Нагрузка по ТЗ п. 10:** **`k6/cinema-lab6-constant.js`** — **фиксированное число VU** и **`duration`**; в каждой итерации с вероятностью **`POST_SHARE`** выполняется **POST** `/api/films`, иначе **GET** аналитики (та же идея, что **`load.js`** одногруппницы с **`LAB6_CONST=1`**). **`k6/run-lab6-ratio-sweep.sh`** три раза подряд меняет **`POST_SHARE`** (5/95, 50/50, 95/5). Дальше — **`plot_k6_reports.py --lab6`** или **`plot_k6_cpu_results.py`** по **`results/cpu-*`**.
 - **С ПК без ручного копирования JSON:** **`scripts/lab6-sync-png-from-k6-vm.sh`** подтягивает **`results/cpu-*`** с k6-ВМ, при необходимости дописывает **`lab6_meta`**, строит **`png_k6/*.png`** (**`LAB6_PLOT_VUS`** = **`--vus`**).
 - **Автоматизация полного цикла лаб. 6 (опционально):** **`k6/lab6-full-automation.sh`** на персональной ВМ меняет CPU в **`.env`**, пересоздаёт контейнер приложения, синхронизирует k6 на общую ВМ и забирает результаты; **`k6/remote-k6-sync-and-run.sh`** — только выгрузка каталога **`k6/`** и запуск прогона по SSH на машине с установленным **k6**.
 
-### Файлы, связанные с лаб. 6 (что делает каждый)
+### k6: актуальные файлы (лаб. 8) и вспомогательные скрипты
 
 | Файл | Назначение |
 |------|------------|
-| **`scripts/ssh-tunnel-personal-vm.sh`** | Запуск на **ПК**: SSH с **`-L 8080:localhost:8080`** к персональной ВМ (по умолчанию порт SSH **2303**). Пока скрипт/сессия живы, браузер на ПК открывает приложение по **`http://localhost:8080`**. |
-| **`k6/cinema-lab6-constant.js`** | Лаб. 6: **`vus` + `duration`**, в итерации **`Math.random() < POST_SHARE`** → POST, иначе GET; метрики **`post_ms`** / **`get_ms`**. |
-| **`k6/run-lab6-ratio-sweep.sh`** | Три прогона подряд с **`POST_SHARE`** 0.05 / 0.5 / 0.95; пишет **`k6/reports/lab6-summary-*.json`**; опционально **`RESULT_CPU`** копирует отчёты в **`results/cpu-*`**. |
-| **`k6/plot_lab6_from_results.py`** | По папкам **`results/cpu-*`** строит графики (среднее POST/GET vs смесь) — **PNG** для отчёта. Нужен **matplotlib**. Флаг **`--vus`**: выбор файлов **`*-vus-N.json`** при смешанных прогонах. |
-| **`k6/inject-lab6-meta-into-results.py`** | Дописывает **`lab6_meta`** в JSON без метаданных (имя файла + **`--base-url`**, **`--k6-route`**, …). Вызывается из **`lab6-sync-png-from-k6-vm.sh`** при **`BASE_URL`**. |
-| **`k6/remote-k6-sync-and-run.sh`** | С машины с репозиторием (ПК или hl03): **rsync** каталога **`k6/`** на общую k6-ВМ и запуск sweep по SSH (**`K6_SSH_*`**, **`BASE_URL`**). См. **`LAB6_SKIP_LOCAL_APP_CHECK`** в шапке скрипта. |
-| **`scripts/lab6-sync-png-from-k6-vm.sh`** | С **ПК**: **rsync** **`~/ermakov_k6/results/`** (или **`K6_REMOTE_DIR`**) → локальный **`./results/`**, опционально **`k6/inject-lab6-meta-into-results.py`** при заданном **`BASE_URL`**, затем **`k6/plot_lab6_from_results.py`** → **`png_k6/`**. Переменные: **`LAB6_PLOT_VUS`**, **`K6_SSH_*`**, **`LAB6_SKIP_PULL`**, **`LAB6_PULL_ONLY`**, **`K6_SSH_BATCH_MODE`**. |
-| **`scripts/lab6-get-png-from-k6-vm.sh`** | Тонкая обёртка над **`lab6-sync-png-from-k6-vm.sh`**. |
-| **`scripts/lab6-remote-k6-plot-and-sync-png.sh`** | С **ПК**: по SSH на k6-ВМ выполняет **один** sweep (**`RESULT_CPU`**, **`TARGET_VUS`**, **`BASE_URL`**), затем вызывает **`lab6-sync-png-from-k6-vm.sh`** (pull **`results/`** + plot). **`LAB6_PLOT_VUS`** выравнивается с **`TARGET_VUS`**. |
-| **`k6/lab6-full-automation.sh`** | «Всё в одном» на ВМ с Docker и клоном репо: смена **`APP_CPU_LIMIT`**, перезапуск **`app`**, удалённый k6, копирование **`results`**, вызов построения графиков. |
-| **`k6/plot_avg_vs_vus.py`** | В основном для **лаб. 4** (VU vs время отклика); к лаб. 6 не обязателен, если используете **`plot_lab6_from_results.py`**. |
-| **`ТЗ_6лаба.txt`** | Текст задания из курса. |
-| **`.env.example`** | Шаблон переменных для Compose и приложения (скопировать в **`.env`**). |
+| **`scripts/ssh-tunnel-personal-vm.sh`** | Запуск на **ПК**: SSH с **`-L 8080:localhost:8080`** к персональной ВМ (по умолчанию порт SSH **2303**). |
+| **`k6/cinema-lab8-constant.js`** | Лаб. 8: **POST** `/api/viewers`, **GET** сводки; метрики **`post_ms`** / **`get_ms`**. |
+| **`k6/run-lab8-ratio-sweep.sh`** | Три прогона смесей; JSON в **`k6/reports/`**; при **`RESULT_CPU`** — **`results/cpu-*`**. |
+| **`k6/plot-lab8-from-results.sh`** | **`plot_k6_cpu_results.py`** с **`lab8-summary`**; по умолчанию вывод в **`k6/png_k6/`**. |
+| **`k6/plot_k6_cpu_results.py`** | PNG из **`results/cpu-*`** (**`--summary-prefix lab8-summary`** или **`lab6-summary`**). |
+| **`scripts/lab6-sync-png-from-k6-vm.sh`** | **rsync** **`results/`** с k6-ВМ → **`./results/`**, затем plot (для лаб. 8 после pull удобнее **`plot-lab8-from-results.sh`**). |
+| **`scripts/lab6-get-png-from-k6-vm.sh`** | Обёртка над **`lab6-sync-png-from-k6-vm.sh`**. |
+| **`scripts/sync-results-from-k6-vm.sh`** | Только синк **`results/`**; дальше например **`scripts/lab8-plot-png.sh`**. |
+| **`scripts/lab8-plot-png.sh`** | Plot лаб. 8 → **`k6/png_k6/`** по локальным **`results/cpu-*`**. |
+| **`ТЗ_6лаба.txt`**, **`docs/lab6-*.md`** | Материалы лаб. 6; сценарии **`cinema-lab6`** / **`run-lab6`** из репозитория убраны — для лаб. 8 не нужны. |
+| **`.env.example`** | Шаблон переменных для Compose. |
 
 ### Порты: что куда стучится
 
@@ -1092,7 +1090,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | **`BASE_URL`** | Базовый URL API для k6 (с ПК через туннель часто **`http://127.0.0.1:8080`**; с k6-ВМ — URL, **доступный с той машины**, например **`http://10.x.x.x:8080`**). |
 | **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`** | Постоянное число виртуальных пользователей, длительность ступени, id фильма для аналитики. |
 | **`RESULT_CPU`** | Метка для копирования JSON в **`results/cpu-0.5`** … **`cpu-2`** после sweep. |
-| **`LAB6_PLOT_VUS`** | Для **`scripts/lab6-sync-png-from-k6-vm.sh`**: какой **`TARGET_VUS`** выбрать в именах файлов (**`--vus`** у **`plot_lab6_from_results.py`**). |
+| **`LAB6_PLOT_VUS`** | Для **`scripts/lab6-sync-png-from-k6-vm.sh`**: какой **`TARGET_VUS`** выбрать в именах файлов (**`--vus`** у **`plot_k6_cpu_results.py`**). |
 | **`LAB6_SKIP_LOCAL_APP_CHECK`** | Для **`k6/remote-k6-sync-and-run.sh`**: не выполнять **`curl`** до **`BASE_URL`** с машины запуска (ПК вне сети приложения). |
 | **`K6_SSH_HOST`**, **`K6_SSH_PORT`**, **`K6_SSH_USER`**, **`K6_REMOTE_DIR`** | Для **`remote-k6-sync-and-run.sh`** / **`lab6-full-automation.sh`** / **`lab6-sync-png-from-k6-vm.sh`**: доступ по SSH к машине с k6. |
 
@@ -1183,7 +1181,7 @@ docker compose up -d
 
 **6. Пункт 10 (k6 и графики)**  
 - Каталог **`k6/reports/`** с **`lab6-summary-*.json`** (лучше сохранить копии для каждого **`APP_CPU_LIMIT`** в **`results/cpu-0.5`**, **`cpu-1.0`**, …).  
-- Три файла **PNG** из **`python3 k6/plot_lab6_from_results.py …`**: **`png_k6/lab6-vs-cpu-mix-5-95.png`**, **`lab6-vs-cpu-mix-50-50.png`**, **`lab6-vs-cpu-mix-95-5.png`**.  
+- Три файла **PNG** из **`python3 k6/plot_k6_cpu_results.py …`**: **`png_k6/lab6-vs-cpu-mix-5-95.png`**, **`lab6-vs-cpu-mix-50-50.png`**, **`lab6-vs-cpu-mix-95-5.png`**.  
 - В тексте отчёта **явно разделите два эксперимента**:  
   - **«ПК → сервер»:** k6 запускался на ПК, **`BASE_URL=http://127.0.0.1:8080`**, SSH-туннель к ВМ.  
   - **«Сервер → сервер»:** k6 запускался на указанной машине (ВМ приложения или общая k6-ВМ), **`BASE_URL`** — URL, **доступный с этой машины** (например внутренний IP приложения).  
@@ -1269,7 +1267,7 @@ OpenAPI/Swagger уже подключены (**`/swagger-ui.html`**, **`/v3/api-
 - Сценарий: **`k6/cinema-lab6-constant.js`**
 - Три прогона подряд: **`./k6/run-lab6-ratio-sweep.sh`** (результаты: **`k6/reports/lab6-summary-*.json`**)
 - Серия CPU: после каждого значения **`APP_CPU_LIMIT`** (шаг **0.5**) задайте **`RESULT_CPU`** при прогоне sweep — JSON попадут в **`results/cpu-0.5`**, **`cpu-1.0`**, … (см. скрипт). Подробный порядок — **«Полный порядок: hl03 + k6-ВМ + ПК»** выше.
-- Графики для отчёта: с ПК **`./scripts/lab6-sync-png-from-k6-vm.sh`** (переменные **`LAB6_PLOT_VUS`**, **`K6_SSH_*`**, **`BASE_URL`** для inject) или вручную **`python3 k6/plot_lab6_from_results.py <каталог_results> -o png_k6 --vus <N>`**.
+- Графики для отчёта: с ПК **`./scripts/lab6-sync-png-from-k6-vm.sh`** (переменные **`LAB6_PLOT_VUS`**, **`K6_SSH_*`**, **`BASE_URL`** для inject) или вручную **`python3 k6/plot_k6_cpu_results.py <каталог_results> -o png_k6 --vus <N>`**.
 
 Переменные: **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`**, **`RESULT_CPU`** (в БД должны быть билеты на этот фильм — Flyway **`V2`** или сидер лаб. 5).
 
@@ -1579,7 +1577,7 @@ export RESULT_CPU=0.5
 Графики (как LAB6, но префиксы lab8):
 
 ```bash
-python3 k6/plot_lab6_from_results.py results -o png_k8 \
+python3 k6/plot_k6_cpu_results.py results -o k6/png_k6 \
   --summary-prefix lab8-summary --vus 400 \
   --title-tag "Лаб. 8 (Additional→CRUD)" \
   --png-prefix lab8-vs-cpu \

@@ -7,7 +7,7 @@
 # См. LAB6_SKIP_PULL=1 — только plot по уже скачанному ./results; LAB6_PULL_ONLY=1 — только копирование.
 # -----------------------------------------------------------------------------
 # Подтянуть каталог results/cpu-* с k6-ВМ и построить PNG локально
-# (k6/plot_lab6_from_results.py из этого репозитория).
+# (k6/plot_k6_cpu_results.py из этого репозитория).
 #
 # Запуск из корня репозитория (один шаг: pull + при необходимости lab6_meta + plot → png_k6/):
 #   export BASE_URL=http://192.168.1.242:8080   # тот же, что у k6 (для inject в старые JSON)
@@ -64,7 +64,7 @@ if [[ -n "${K6_SSH_IDENTITY_FILE:-}" ]]; then
   SCP_OPTS+=(-o IdentitiesOnly=yes -i "${K6_SSH_IDENTITY_FILE}")
 fi
 
-PLOT_PY="${ROOT}/k6/plot_lab6_from_results.py"
+PLOT_PY="${ROOT}/k6/plot_k6_cpu_results.py"
 INJECT_PY="${ROOT}/k6/inject-lab6-meta-into-results.py"
 [[ -f "${PLOT_PY}" ]] || {
   echo "Нет ${PLOT_PY} — запускайте из корня репозитория lab2_rovnyagin." >&2
@@ -133,19 +133,20 @@ if [[ "${LAB6_PULL_ONLY:-0}" == "1" ]]; then
 fi
 
 # Один заход: подписи на PNG — дописать lab6_meta только там, где его нет (старые JSON с ВМ).
+# Скрипт inject удалён из репозитория; шаг пропускается, если файла нет.
 LAB6_META_BASE_URL_EFFECT="${LAB6_META_BASE_URL:-${BASE_URL:-}}"
 if [[ -n "${LAB6_META_BASE_URL_EFFECT}" ]]; then
-  [[ -f "${INJECT_PY}" ]] || {
-    echo "Нет ${INJECT_PY}" >&2
-    exit 1
-  }
-  META_ROUTE="${LAB6_META_K6_ROUTE:-${K6_ROUTE:-server-to-server}}"
-  echo "==> inject lab6_meta (если отсутствует): base_url=${LAB6_META_BASE_URL_EFFECT} k6_route=${META_ROUTE}"
-  python3 "${INJECT_PY}" "${RESULTS_DIR}" \
-    --base-url "${LAB6_META_BASE_URL_EFFECT}" \
-    --duration "${LAB6_META_DURATION:-90s}" \
-    --k6-route "${META_ROUTE}" \
-    --film-id "${LAB6_META_FILM_ID:-1}"
+  if [[ -f "${INJECT_PY}" ]]; then
+    META_ROUTE="${LAB6_META_K6_ROUTE:-${K6_ROUTE:-server-to-server}}"
+    echo "==> inject lab6_meta (если отсутствует): base_url=${LAB6_META_BASE_URL_EFFECT} k6_route=${META_ROUTE}"
+    python3 "${INJECT_PY}" "${RESULTS_DIR}" \
+      --base-url "${LAB6_META_BASE_URL_EFFECT}" \
+      --duration "${LAB6_META_DURATION:-90s}" \
+      --k6-route "${META_ROUTE}" \
+      --film-id "${LAB6_META_FILM_ID:-1}"
+  else
+    echo "Предупреждение: ${INJECT_PY} нет в репозитории — шаг inject пропущен (нужен lab6_meta в JSON, как у cinema-lab8-constant.js)." >&2
+  fi
 fi
 
 python3 -c 'import matplotlib' 2>/dev/null || {

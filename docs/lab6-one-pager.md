@@ -81,10 +81,10 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 ./k6/run-lab6-ratio-sweep.sh
 ```
 
-`K6_ROUTE`: **`pc-to-server`** — k6 с ПК через SSH-туннель к `BASE_URL`; **`server-to-server`** — k6 на учебной ВМ, `BASE_URL` до приложения по сети (как в **`remote-k6-sync-and-run.sh`**, там по умолчанию уже `server-to-server`). В каждом JSON есть **`lab6_meta`** (VU, длительность, URL, маршрут) — **`plot_lab6_from_results.py`** выводит это в заголовок графика.
+`K6_ROUTE`: **`pc-to-server`** — k6 с ПК через SSH-туннель к `BASE_URL`; **`server-to-server`** — k6 на учебной ВМ, `BASE_URL` до приложения по сети (как в **`remote-k6-sync-and-run.sh`**, там по умолчанию уже `server-to-server`). В каждом JSON есть **`lab6_meta`** (VU, длительность, URL, маршрут) — **`plot_k6_cpu_results.py`** выводит это в заголовок графика.
 
 Копирование отчётов по CPU: `RESULT_CPU=0.5|1.0|1.5|2 ./k6/run-lab6-ratio-sweep.sh`  
-Графики: `python3 k6/plot_lab6_from_results.py results -o png_k6` (нужен matplotlib). Скрипт требует **`lab6_meta`** во всех JSON и однородную серию прогонов — иначе выход с ошибкой.
+Графики: `python3 k6/plot_k6_cpu_results.py results -o png_k6` (нужен matplotlib). Скрипт требует **`lab6_meta`** во всех JSON и однородную серию прогонов — иначе выход с ошибкой.
 
 **Тяжелее аналитика (опционально):** больше строк в БД — **`./tools/run-seed.sh`** или `COUNT=… ./tools/run-seed.sh` перед серией прогонов (один и тот же объём данных на всю серию).
 
@@ -109,7 +109,7 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 | `scripts/ssh-tunnel-personal-vm.sh` | Туннель 8080 с ПК на ВМ |
 | `k6/cinema-lab6-constant.js` | постоянные VU; в итерации POST с вероятностью POST_SHARE (как zil LAB6) |
 | `k6/run-lab6-ratio-sweep.sh` | 5/95, 50/50, 95/5 подряд |
-| `k6/plot_lab6_from_results.py` | PNG из `results/cpu-*` |
+| `k6/plot_k6_cpu_results.py` | PNG из `results/cpu-*` |
 | `k6/remote-k6-sync-and-run.sh` | rsync k6 + запуск на удалённой k6-ВМ |
 
 ---

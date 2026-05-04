@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-LAB6 (п. 10 ТЗ): три итоговых графика — по одному на нагрузку 5/95, 50/50, 95/5
-(вставка/чтение). На каждом: ось X — лимит CPU (0.5, 1.0, 1.5, 2 vCPU), ось Y —
-среднее время отклика (мс) при постоянных VU; две кривые — POST и GET.
+k6 → PNG: три графика по смесям 5/95, 50/50, 95/5 (лаб. 6 п. 10 ТЗ и лаб. 8).
+На каждом: ось X — лимит CPU (подкаталоги results/cpu-*), ось Y — среднее время
+отклика (мс) при постоянных VU; две кривые — POST и GET.
 
-Каждый JSON должен содержать lab6_meta (пишет cinema-lab6-constant.js при запуске
-через run-lab6-ratio-sweep.sh). Иначе скрипт завершится с ошибкой.
+Каждый JSON должен содержать lab6_meta (пишет cinema-lab8-constant.js при запуске
+через run-lab8-ratio-sweep.sh; то же поле использовалась лаб. 6).
 
 Одна серия прогонов: одинаковые TARGET_VUS в именах файлов и одинаковое ядро
 lab6_meta между всеми results/cpu-* и всеми смесиями — иначе ошибка.
@@ -63,14 +63,34 @@ def extract_avg_from_trend(trend: dict) -> Optional[float]:
     return float(a) if a is not None else None
 
 
-def extract_metric(summary: dict, name: str) -> Optional[float]:
-    return extract_avg_from_trend((summary.get("metrics") or {}).get(name) or {})
+def _avg_from_http_name_tag(metrics: dict, name_token: str) -> Optional[float]:
+    """Фолбэк: k6 кладёт подметрики http_req_duration{name:...} в summary."""
+    for key, trend in (metrics or {}).items():
+        if not isinstance(key, str) or not key.startswith("http_req_duration{"):
+            continue
+        if name_token not in key:
+            continue
+        avg = extract_avg_from_trend(trend if isinstance(trend, dict) else {})
+        if avg is not None:
+            return avg
+    return None
 
 
-def extract_post_get_avg(summary: dict) -> tuple[Optional[float], Optional[float]]:
-    m = summary.get("metrics") or {}
-    p = extract_metric(summary, METRIC_POST) or extract_metric(summary, METRIC_POST_LEGACY)
-    g = extract_metric(summary, METRIC_GET) or extract_metric(summary, METRIC_GET_LEGACY)
+def extract_post_get_avg(data: dict) -> tuple[Optional[float], Optional[float]]:
+    """Читает post_ms/get_ms из summary k6; фолбэк — подметрика http_req_duration{name:Lab8Post|Lab8Get}."""
+    m = data.get("metrics") or {}
+    p = (
+        extract_avg_from_trend(m.get(METRIC_POST) or {})
+        or extract_avg_from_trend(m.get(METRIC_POST_LEGACY) or {})
+    )
+    g = (
+        extract_avg_from_trend(m.get(METRIC_GET) or {})
+        or extract_avg_from_trend(m.get(METRIC_GET_LEGACY) or {})
+    )
+    if g is None:
+        g = _avg_from_http_name_tag(m, "name:Lab8Get")
+    if p is None:
+        p = _avg_from_http_name_tag(m, "name:Lab8Post")
     return p, g
 
 
@@ -110,7 +130,7 @@ def find_mix_json(
         die(
             f"{folder.name}: в одном миксе лежат JSON с разным TARGET_VUS: {sorted(vus_set)}. "
             f"Удалите лишние {summary_prefix}-*-vus-*.json или укажите: "
-            f"python3 k6/plot_lab6_from_results.py … --vus 400"
+            f"python3 k6/plot_k6_cpu_results.py … --vus 400"
         )
     if not vus_set:
         return paths[0]
@@ -155,8 +175,8 @@ def parse_lab6_meta(data: dict, path: Path) -> dict:
     if not isinstance(raw, dict):
         die(
             f"{path}: нет объекта lab6_meta — переснимите прогоны через "
-            f"k6/run-lab6-ratio-sweep.sh (актуальный cinema-lab6-constant.js) или один раз: "
-            f"python3 k6/inject-lab6-meta-into-results.py <results> --base-url … --duration … --k6-route …"
+            f"k6/run-lab8-ratio-sweep.sh (актуальный cinema-lab8-constant.js); "
+            f"для лаб. 6 этот блок раньше добавлял k6/inject-lab6-meta-into-results.py (файл удалён из репо)."
         )
     try:
         tv = int(raw["target_vus"])
@@ -246,7 +266,9 @@ def collect_series_for_mix(
 
         if p is None or g is None:
             issues.append(
-                f"{path.name}: нет метрик post_ms/get_ms или k6_* (post={p} get={g})"
+                f"{path.name}: нет post_ms и get_ms (и нет http_req_duration с name:Lab8Post/Lab8Get); "
+                f"post={p} get={g}. Синхронизируйте k6/cinema-lab8-constant.js и переснимите sweep "
+                f"(старые JSON без get_ms строить нельзя — будет искажение)."
             )
             continue
         rows.append((cpu_v, p, g, vus, meta))
@@ -331,7 +353,7 @@ def plot_mix(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Лаб. 6: 3 PNG — время отклика vs лимит CPU для смесей 5/95, 50/50, 95/5"
+        description="k6 (лаб. 6/8): 3 PNG — время отклика vs лимит CPU для смесей 5/95, 50/50, 95/5"
     )
     p.add_argument(
         "results",
