@@ -25,10 +25,10 @@ public class AdditionalApiExceptionHandler {
     @ExceptionHandler(AnalyticsException.class)
     public ResponseEntity<ProblemDetail> handleAnalytics(AnalyticsException e) {
         HttpStatus status = e.getStatus();
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, e.getMessage());
-        pd.setType(ABOUT_BLANK);
-        pd.setTitle(status.getReasonPhrase());
-        return ResponseEntity.status(status).body(pd);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, e.getMessage());
+        problem.setType(ABOUT_BLANK);
+        problem.setTitle(status.getReasonPhrase());
+        return ResponseEntity.status(status).body(problem);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -36,10 +36,10 @@ public class AdditionalApiExceptionHandler {
         String detail = e.getConstraintViolations().stream()
                 .map(ConstraintViolation::getMessage)
                 .collect(Collectors.joining("; "));
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-        pd.setType(ABOUT_BLANK);
-        pd.setTitle(HttpStatus.BAD_REQUEST.getReasonPhrase());
-        return ResponseEntity.badRequest().body(pd);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setType(ABOUT_BLANK);
+        problem.setTitle(HttpStatus.BAD_REQUEST.getReasonPhrase());
+        return ResponseEntity.badRequest().body(problem);
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
@@ -48,10 +48,10 @@ public class AdditionalApiExceptionHandler {
                 .flatMap(p -> p.getResolvableErrors().stream())
                 .map(AdditionalApiExceptionHandler::messageOf)
                 .collect(Collectors.joining("; "));
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-        pd.setType(ABOUT_BLANK);
-        pd.setTitle(HttpStatus.BAD_REQUEST.getReasonPhrase());
-        return ResponseEntity.badRequest().body(pd);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setType(ABOUT_BLANK);
+        problem.setTitle(HttpStatus.BAD_REQUEST.getReasonPhrase());
+        return ResponseEntity.badRequest().body(problem);
     }
 
     private static String messageOf(MessageSourceResolvable r) {

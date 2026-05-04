@@ -11,8 +11,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Duration;
 
 /**
- * {@link RestTemplate} для {@link ru.hse.lab8.additional.client.CinemaCrudClient}; Jackson берётся из бина {@link ObjectMapper}
- * ({@link JacksonConfiguration} — {@link java.time} и record-DTO).
+ * {@link RestTemplate} для {@link ru.hse.lab8.additional.client.CinemaCrudClient}; Jackson берётся из общего бина {@link ObjectMapper}.
  *
  * <p>После полного перехода фреймворка на {@code JacksonJsonHttpMessageConverter} можно заменить конвертер и снять {@code SuppressWarnings}.
  */

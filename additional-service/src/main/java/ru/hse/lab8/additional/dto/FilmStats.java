@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 /**
  * Результат аналитики по одному фильму: «лучший» день по числу уникальных зрителей и это число.
- * Используется и для {@code GET /api/analytics/max-viewers-by-film-title}, и для элемента списка сводки.
+ * Используется как элемент списка сводки {@code GET /api/analytics/films/max-viewers-summary}.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record FilmStats(

@@ -1,13 +1,10 @@
 package ru.hse.lab8.additional.controller;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.hse.lab.shared.analytics.TopFilmsReportLimits;
 import ru.hse.lab8.additional.dto.FilmStats;
 import ru.hse.lab8.additional.service.AnalyticsService;
 
@@ -24,14 +21,10 @@ public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
 
-    @GetMapping("/max-viewers-by-film-title")
-    public FilmStats maxViewersByFilmTitle(@RequestParam("filmTitle") @NotBlank String filmTitle) {
-        return analyticsService.maxViewersByFilmTitle(filmTitle);
-    }
-
+    /** Возвращает список фильмов с днём максимальной посещаемости уникальными зрителями. */
     @GetMapping("/films/max-viewers-summary")
-    public List<FilmStats> maxViewersSummary(@RequestParam(required = false) Integer limit) {
-        int effective = TopFilmsReportLimits.effectiveLimit(limit);
-        return analyticsService.maxViewersSummaries(effective);
+    public List<FilmStats> maxViewersSummary() {
+        // Контроллер только делегирует: вся бизнес-агрегация находится в сервисном слое.
+        return analyticsService.maxViewersSummary();
     }
 }

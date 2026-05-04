@@ -2,6 +2,9 @@ package ru.hse.lab8.additional.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * Базовый URL основного CRUD; при установке удаляются пробелы по краям и завершающие слэши.
+ */
 @ConfigurationProperties(prefix = "main.crud")
 public class MainCrudProperties {
 

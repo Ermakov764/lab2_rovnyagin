@@ -50,7 +50,7 @@ services:
       - "${ADDITIONAL_PUBLISH_PORT:-8081}:8081"
     environment:
       SERVER_PORT: "8081"
-      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://crud-app:8080}
+      MAIN_CRUD_BASE_URL: ${MAIN_CRUD_BASE_URL:-http://localhost:8080}
       JAVA_TOOL_OPTIONS: ${ADDITIONAL_JAVA_TOOL_OPTIONS:-}
     deploy:
       resources:

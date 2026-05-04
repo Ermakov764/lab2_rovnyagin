@@ -4,11 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpStatus;
+import ru.hse.lab8.additional.dto.FilmStats;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import ru.hse.lab8.additional.AnalyticsException;
 import ru.hse.lab8.additional.service.AnalyticsService;
+
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,22 +28,16 @@ class AnalyticsControllerWebMvcTest {
     private AnalyticsService analyticsService;
 
     @Test
-    void blankFilmTitle_returns400ProblemDetail() throws Exception {
-        mockMvc.perform(get("/api/analytics/max-viewers-by-film-title")
-                        .param("filmTitle", "   "))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.detail").exists());
-    }
+    void summary_returns200AndBody() throws Exception {
+        when(analyticsService.maxViewersSummary()).thenReturn(List.of(
+                new FilmStats("A", 1L, LocalDate.of(2026, 4, 21), 5L)
+        ));
 
-    @Test
-    void notFound_returns404ProblemDetail() throws Exception {
-        when(analyticsService.maxViewersByFilmTitle("x")).thenThrow(
-                new AnalyticsException("Film not found by title: x", HttpStatus.NOT_FOUND));
-
-        mockMvc.perform(get("/api/analytics/max-viewers-by-film-title").param("filmTitle", "x"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.detail").value("Film not found by title: x"));
+        mockMvc.perform(get("/api/analytics/films/max-viewers-summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].filmId").value(1))
+                .andExpect(jsonPath("$[0].filmTitle").value("A"))
+                .andExpect(jsonPath("$[0].day").value("2026-04-21"))
+                .andExpect(jsonPath("$[0].maxViewersOnSessionForDay").value(5));
     }
 }

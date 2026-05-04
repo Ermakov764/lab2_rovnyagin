@@ -36,11 +36,13 @@ public class CinemaCrudClient {
     private final MainCrudProperties properties;
 
     public List<CrudFilm> fetchFilms() {
-        return exchange(uriFromPath(PATH_FILMS), FILM_LIST);
+        // Additional не хранит фильмы у себя: всегда берём актуальный список из CRUD.
+        return getList(uriFromPath(PATH_FILMS), FILM_LIST);
     }
 
     public List<CrudTicket> fetchAllTickets() {
-        return exchange(uriFromPath(PATH_TICKETS), TICKET_LIST);
+        // Билеты также берём "как есть" из CRUD и потом агрегируем в сервисе.
+        return getList(uriFromPath(PATH_TICKETS), TICKET_LIST);
     }
 
     private URI uriFromPath(String pathFromBase) {
@@ -50,11 +52,12 @@ public class CinemaCrudClient {
                 .toUri();
     }
 
-    private <T> List<T> exchange(URI uri, ParameterizedTypeReference<List<T>> type) {
+    private <T> List<T> getList(URI uri, ParameterizedTypeReference<List<T>> type) {
         try {
             List<T> body = mainCrudRestTemplate.exchange(uri, HttpMethod.GET, null, type).getBody();
             return body != null ? body : Collections.emptyList();
         } catch (HttpStatusCodeException e) {
+            // Прячем детали внешнего сервиса за единым типом ошибки домена аналитики.
             throw new AnalyticsException(
                     "Main CRUD responded with " + e.getStatusCode().value() + ": " + e.getStatusText(),
                     HttpStatus.BAD_GATEWAY);
