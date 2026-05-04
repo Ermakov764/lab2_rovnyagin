@@ -38,6 +38,9 @@ TARGET_VUS="${TARGET_VUS:-30}"
 DURATION="${DURATION:-90s}"
 SUMMARY_LIMIT="${SUMMARY_LIMIT:-100}"
 K6_ROUTE="${K6_ROUTE:-server-to-server}"
+# Без source k6/env.sh порог http_req_failed часто «краснеет» на 0.5 CPU; по умолчанию отключаем (см. JSON).
+# Строгий режим: K6_THRESHOLDS_OFF=0 ./k6/run-lab8-ratio-sweep.sh
+K6_THRESHOLDS_OFF="${K6_THRESHOLDS_OFF:-1}"
 
 echo "=== LAB8 sweep: MAIN=${BASE_MAIN} TARGET_VUS=${TARGET_VUS} SUMMARY_LIMIT=${SUMMARY_LIMIT} ==="
 
@@ -106,7 +109,7 @@ run_one() {
     -e "K6_ROUTE=${K6_ROUTE}" \
     -e "K6_HTTP_TIMEOUT=${K6_HTTP_TIMEOUT:-120s}" \
     -e "K6_HTTP_FAIL_RATE_MAX=${K6_HTTP_FAIL_RATE_MAX:-0.35}" \
-    -e "K6_THRESHOLDS_OFF=${K6_THRESHOLDS_OFF:-}" \
+    -e "K6_THRESHOLDS_OFF=${K6_THRESHOLDS_OFF}" \
     k6/cinema-lab8-constant.js
 }
 

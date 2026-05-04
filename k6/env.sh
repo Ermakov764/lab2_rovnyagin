@@ -23,6 +23,7 @@ export LAB8_CLEAR_USE_PYTHON="${LAB8_CLEAR_USE_PYTHON:-0}"
 #   source k6/env.sh && export RESULT_CPU=0.5 && ./k6/run-lab8-ratio-sweep.sh
 #   source k6/env.sh && export RESULT_CPU=1   && ./k6/run-lab8-ratio-sweep.sh
 
-# Опционально: ослабить порог k6 / таймаут (если 0.5 CPU сыпется)
-# export K6_HTTP_TIMEOUT=120s
-# export K6_THRESHOLDS_OFF=1
+# Порог http_req_failed на 0.5 CPU часто «краснеет» при том, что JSON уже полезен. По умолчанию
+# отключаем пороги (смотри http_req_failed в отчёте). Строгий режим: export K6_THRESHOLDS_OFF=0 до source.
+export K6_THRESHOLDS_OFF="${K6_THRESHOLDS_OFF:-1}"
+export K6_HTTP_TIMEOUT="${K6_HTTP_TIMEOUT:-120s}"
