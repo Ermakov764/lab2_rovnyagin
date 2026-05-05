@@ -27,10 +27,6 @@
 #   PGADMIN_SSH_HOST   — по умолчанию как SSH_HOST
 #   PGADMIN_SSH_USER   — по умолчанию как SSH_USER
 #
-#   AUTO_START_REMOTE_APP — 0 чтобы не трогать Docker на ВМ (по умолчанию 1: лаб. 7 app)
-#   REMOTE_REPO_SUBDIR    — каталог репозитория относительно $HOME на ВМ (по умолчанию lab2_rovnyagin)
-#   LAB7_COMPOSE_FILE     — compose только приложения (по умолчанию docker-compose.lab7-app.yml)
-#
 # Доп. аргументы передаются в ssh персональной ВМ. При -f туннель pgAdmin не стартует
 # (нужен второй терминал или запуск без -f); см. сообщение скрипта.
 #
@@ -67,30 +63,6 @@ PGADMIN_SSH_USER="${PGADMIN_SSH_USER:-$SSH_USER}"
 
 REMOTE="${SSH_USER}@${SSH_HOST}"
 PGADMIN_REMOTE="${PGADMIN_SSH_USER}@${PGADMIN_SSH_HOST}"
-
-AUTO_START_REMOTE_APP="${AUTO_START_REMOTE_APP:-1}"
-REMOTE_REPO_SUBDIR="${REMOTE_REPO_SUBDIR:-lab2_rovnyagin}"
-LAB7_COMPOSE_FILE="${LAB7_COMPOSE_FILE:-docker-compose.lab7-app.yml}"
-
-if [[ "${AUTO_START_REMOTE_APP}" != "0" ]]; then
-  echo "Персональная ВМ: проверка сервиса app (${LAB7_COMPOSE_FILE})..."
-  if ! ssh -p "${SSH_PORT}" "${REMOTE}" bash -s <<EOF
-set -euo pipefail
-cd "\${HOME}/${REMOTE_REPO_SUBDIR}"
-if docker compose -f '${LAB7_COMPOSE_FILE}' ps app 2>/dev/null | grep -q 'Up'; then
-  echo "Контейнер app уже запущен."
-else
-  echo "Запуск: docker compose -f '${LAB7_COMPOSE_FILE}' --env-file .env up -d"
-  docker compose -f '${LAB7_COMPOSE_FILE}' --env-file .env up -d
-fi
-EOF
-  then
-    echo "Ошибка: не удалось проверить/запустить Docker на ВМ (SSH, каталог ~/${REMOTE_REPO_SUBDIR}, docker?)." >&2
-    echo "Повторите с AUTO_START_REMOTE_APP=0 и поднимите контейнер вручную." >&2
-    exit 1
-  fi
-  echo ""
-fi
 
 cleanup() {
   if [[ -n "${PGADMIN_PID:-}" ]] && kill -0 "$PGADMIN_PID" 2>/dev/null; then

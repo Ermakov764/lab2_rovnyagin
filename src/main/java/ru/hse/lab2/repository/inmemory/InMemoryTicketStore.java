@@ -191,36 +191,4 @@ public class InMemoryTicketStore implements TicketStore {
                 })
                 .toList();
     }
-
-    @Override
-    public synchronized List<Object[]> findAllFilmDailyViewerAggregates(int maxRows) {
-        Map<Long, String> filmTitles = new LinkedHashMap<>();
-        Map<Long, Map<LocalDate, Set<Long>>> byFilmAndDay = new LinkedHashMap<>();
-        for (Ticket t : tickets.values()) {
-            Long filmId = t.getFilm().getId();
-            filmTitles.putIfAbsent(filmId, t.getFilm().getTitle());
-            byFilmAndDay
-                    .computeIfAbsent(filmId, ignored -> new LinkedHashMap<>())
-                    .computeIfAbsent(t.getSessionDate(), ignored -> new LinkedHashSet<>())
-                    .add(t.getViewer().getId());
-        }
-        List<Object[]> out = new ArrayList<>();
-        List<Long> limitedIds = byFilmAndDay.keySet().stream()
-                .sorted()
-                .limit(maxRows)
-                .toList();
-        for (Long filmId : limitedIds) {
-            String title = filmTitles.get(filmId);
-            Map<LocalDate, Set<Long>> days = byFilmAndDay.get(filmId);
-            if (days == null) {
-                continue;
-            }
-            days.entrySet().stream()
-                    .sorted(Comparator.<Map.Entry<LocalDate, Set<Long>>>comparingLong(e -> (long) e.getValue().size()).reversed()
-                            .thenComparing(Map.Entry::getKey))
-                    .findFirst()
-                    .ifPresent(best -> out.add(new Object[]{filmId, title, best.getKey(), (long) best.getValue().size()}));
-        }
-        return out;
-    }
 }

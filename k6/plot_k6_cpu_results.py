@@ -175,7 +175,7 @@ def parse_lab6_meta(data: dict, path: Path) -> dict:
     if not isinstance(raw, dict):
         die(
             f"{path}: нет объекта lab6_meta — переснимите прогоны через "
-            f"k6/run-lab8-ratio-sweep.sh (актуальный cinema-lab8-constant.js); "
+            f"k6/run-ratio-sweep.sh (актуальный cinema-constant.js); "
             f"для лаб. 6 этот блок раньше добавлял k6/inject-lab6-meta-into-results.py (файл удалён из репо)."
         )
     try:
@@ -267,7 +267,7 @@ def collect_series_for_mix(
         if p is None or g is None:
             issues.append(
                 f"{path.name}: нет post_ms и get_ms (и нет http_req_duration с name:Lab8Post/Lab8Get); "
-                f"post={p} get={g}. Синхронизируйте k6/cinema-lab8-constant.js и переснимите sweep "
+                f"post={p} get={g}. Синхронизируйте k6/cinema-constant.js и переснимите sweep "
                 f"(старые JSON без get_ms строить нельзя — будет искажение)."
             )
             continue
@@ -380,7 +380,7 @@ def main() -> None:
         "--summary-prefix",
         default="lab6-summary",
         metavar="PREFIX",
-        help="Префикс имён JSON (lab6-summary или lab8-summary)",
+        help="Префикс имён JSON (например summary)",
     )
     p.add_argument(
         "--title-tag",
@@ -392,7 +392,7 @@ def main() -> None:
         "--png-prefix",
         default="lab6-vs-cpu",
         metavar="PREFIX",
-        help="Префикс имён PNG (lab6-vs-cpu или lab8-vs-cpu)",
+        help="Префикс имён PNG (например vs-cpu)",
     )
     p.add_argument(
         "--post-legend",

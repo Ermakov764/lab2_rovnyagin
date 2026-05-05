@@ -1,15 +1,15 @@
-# Лаб. 8: хосты, IP, порты — сводка
+# Hosts, IP and ports
 
-Актуальные **IP/порты** из вашей схемы (hl03 / hl11 / hl12). **Пароли** храните в **`.env`**, в git не коммитьте.
+Актуальные **IP/порты** для схемы `hl03 / hl11 / hl12`. **Пароли** храните в **`.env`** и не коммитьте.
 
 ---
 
-## 0. Одна таблица: кто где и зачем
+## 0. Кто где и зачем
 
 | Роль | Имя ВМ | IP (пример) | Порты (снаружи) | Зачем |
 |------|--------|-------------|-----------------|--------|
 | **CRUD + Additional** | **hl03** | **10.60.3.33** | **8080** CRUD, **8081** Additional | k6 бьёт в `http://10.60.3.33:8080`. |
-| **PostgreSQL** | **hl12** | **10.60.3.9** (с сети); **127.0.0.1** (только с hl12) | **5433** → в контейнере **5432** | JDBC с hl03: `DBHOST`/`DBPORT`. |
+| **PostgreSQL** | **hl12** | **10.60.3.9** (с сети); **127.0.0.1** (только с hl12) | **5433** -> в контейнере **5432** | JDBC с hl03: `DBHOST`/`DBPORT`. |
 | **k6** | **hl11** | *см. `hostname -I`* | — | Нагрузка и графики, CRUD не поднимают. |
 
 Проверка с hl11: `curl -sS -o /dev/null -w '%{http_code}\n' http://10.60.3.33:8080/actuator/health`
@@ -18,7 +18,7 @@
 
 ## 1. PostgreSQL: откуда как подключаться (psql / JDBC)
 
-На **hl12** Postgres в Docker проброшен на хост как **`0.0.0.0:5433 → 5432`** в контейнере. **Порт для клиента всегда тот, что на хосте** (у вас **5433**), не 5432 снаружи.
+На **hl12** Postgres в Docker проброшен как **`0.0.0.0:5433 -> 5432`**. Для клиентов используйте **внешний порт хоста** (обычно **5433**), а не `5432`.
 
 | Откуда вы подключаетесь | Host | Port | База (пример) | Пользователь |
 |-------------------------|------|------|---------------|--------------|
@@ -40,7 +40,7 @@ PGPASSWORD='…' psql -h 127.0.0.1 -p 5433 -U postgres -d hl3
 docker run --rm -e PGPASSWORD='…' postgres:15-alpine psql -h 10.60.3.9 -p 5433 -U postgres -d hl3 -c 'SELECT current_database();'
 ```
 
-**Скрипты вроде `createDB.sh`** иногда используют **`localhost:5432`** — это может быть **другой контекст** (подключение изнутри контейнера Postgres, где порт **5432**, или отдельная установка). С **хоста hl12** к Docker-Postgres без пляски обычно идут на **`127.0.0.1:5433`**.
+Если где-то встречается `localhost:5432`, это обычно другой контекст (подключение изнутри контейнера или локальная установка). С **хоста hl12** к Docker-Postgres обычно подключаются к **`127.0.0.1:5433`**.
 
 ---
 
@@ -55,7 +55,7 @@ docker run --rm -e PGPASSWORD='…' postgres:15-alpine psql -h 10.60.3.9 -p 5433
 
 ---
 
-## 3. `.env` на hl03 (лаб. 8 + БД на hl12)
+## 3. `.env` на hl03 (с БД на hl12)
 
 | Параметр | Пример | Комментарий |
 |----------|--------|-------------|
@@ -82,19 +82,14 @@ JDBC: `jdbc:postgresql://10.60.3.9:5433/hl3?currentSchema=hl3`
 1. **`DBPORT`** на hl03 = порт публикации на **hl12** (часто **5433**, не 5432).  
 2. С hl03: `nc -zv 10.60.3.9 5433` или `pg_isready -h 10.60.3.9 -p 5433`.  
 3. С hl12: `psql -h 127.0.0.1 -p 5433 …` — удобно отлаживать пароль/БД без сети.  
-4. Логи: `docker compose -f docker-compose.lab8-hl12.yml logs crud-app --tail 120`
+4. Логи: `docker compose -f docker-compose.hl12.yml logs crud-app --tail 120`
 
 ---
 
-## 6. pgAdmin: как зайти и подключить сервер (чтобы не забыть)
+## 6. pgAdmin: вход и подключение сервера
 
-**Где живёт pgAdmin:** в **`docker-compose.lab7-db.yml`** на узле БД (обычно **hl12**), не в `docker-compose.lab8-hl12.yml` на hl03. Поднять стек:
-
-```bash
-cd /path/to/repo   # где лежит compose и .env для hl12
-docker compose -f docker-compose.lab7-db.yml --env-file .env up -d
-docker compose -f docker-compose.lab7-db.yml ps   # lab7_pgadmin, lab7_postgres — Up
-```
+**Где живёт pgAdmin:** на узле БД (обычно **hl12**) в отдельном DB-стеке курса.  
+В этой ветке compose-файл DB-узла не хранится; `docker-compose.hl12.yml` на hl03 поднимает только `crud-app` и `additional-app`.
 
 **Открыть в браузере**
 
@@ -107,13 +102,13 @@ docker compose -f docker-compose.lab7-db.yml ps   # lab7_pgadmin, lab7_postgres 
 **Логин в pgAdmin (веб-форма)**
 
 - **Email** и **пароль** из **`.env` на hl12:** **`PGADMIN_DEFAULT_EMAIL`**, **`PGADMIN_DEFAULT_PASSWORD`**.  
-- Если не задавали — в **`docker-compose.lab7-db.yml`** заглушки `admin@admin.com` / `admin_password`. На курсе часто свои значения (**не** путать с паролем пользователя `postgres` в БД).
+- Если не задавали, берите значения из compose/.env на узле БД. На курсе часто свои значения (**не** путать с паролем пользователя `postgres` в БД).
 
 **После входа: привязать PostgreSQL**
 
-1. **Object → Register → Server** (вкладка **General:** любое имя).
+1. **Object -> Register -> Server** (вкладка **General:** любое имя).
 2. Вкладка **Connection:**
-   - **Host name/address:** **`postgresdb`** — имя сервиса Postgres **в том же** `docker-compose.lab7-db.yml` (трафик идёт между контейнерами по внутренней сети Docker).
+   - **Host name/address:** имя сервиса Postgres в DB-стеке на hl12 (часто `postgresdb`).
    - **Port:** **`5432`** (порт Postgres **внутри** контейнера, не **5433** с хоста).
    - **Maintenance database:** **`postgres`** или твоя база (**`hl3`**).
    - **Username / Password:** как **`POSTGRES_USER`** / **`POSTGRES_PASSWORD`** в **`.env` на hl12** (то же, что для приложения на hl03 в **`SPRING_DATASOURCE_*`**, если одна учётка).

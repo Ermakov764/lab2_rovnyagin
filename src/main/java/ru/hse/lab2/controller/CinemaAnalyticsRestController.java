@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -17,9 +16,8 @@ import java.net.URI;
  * <p><b>Что открыто снаружи:</b>
  * <ul>
  *   <li>{@code GET /api/cinema/ping} — проверка живости.</li>
- *   <li>{@code /api/cinema/films/max-viewers-summary} и алиас {@code /api/tickets/analytics/max-viewers/by-films} —
- *       прокси на Additional {@code GET /api/analytics/films/max-viewers-summary} с тем же query-параметром {@code limit}
- *       (если не указан — default только в Additional).</li>
+ *   <li>{@code GET /api/cinema/films/max-viewers-summary} —
+ *       прокси на Additional {@code GET /api/analytics/films/max-viewers-summary}.</li>
  * </ul>
  */
 @RestController
@@ -42,22 +40,15 @@ public class CinemaAnalyticsRestController {
     }
 
     @GetMapping(
-            value = {
-                    "/api/cinema/films/max-viewers-summary",
-                    "/api/tickets/analytics/max-viewers/by-films"
-            },
+            value = "/api/cinema/films/max-viewers-summary",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public String filmMaxViewersSummaryProxy(
-            @RequestParam(required = false) Integer limit
-    ) {
+    public String filmMaxViewersSummaryProxy() {
         String base = additionalServiceBaseUrl.replaceAll("/+$", "");
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(base)
-                .path("/api/analytics/films/max-viewers-summary");
-        if (limit != null) {
-            uriBuilder.queryParam("limit", limit);
-        }
-        URI uri = uriBuilder.build(true).toUri();
+        URI uri = UriComponentsBuilder.fromUriString(base)
+                .path("/api/analytics/films/max-viewers-summary")
+                .build(true)
+                .toUri();
         String body = additionalServiceRestTemplate.getForObject(uri, String.class);
         return body != null ? body : "[]";
     }

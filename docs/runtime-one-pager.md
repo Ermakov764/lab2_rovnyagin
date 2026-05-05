@@ -1,12 +1,12 @@
-# Лабораторная 6 — одна страница
+# Runtime one-pager
 
-Полная версия: **`README.md`** (раздел *«Лабораторная работа №6»*), задание: **`ТЗ_6лаба.txt`**.
+Полная версия: **`README.md`**, задание: **`ТЗ_6лаба.txt`**.
 
 ---
 
 ## Суть
 
-ВМ → **Docker Compose** (app + Postgres + pgAdmin) → конфиг через **`.env`** (БД, Tomcat, JPA, лимиты CPU/RAM) → доступ с ПК по **SSH `-L 8080:localhost:8080`** → **k6** (const VU, смеси 5/95, 50/50, 95/5) → **графики** по CPU.
+ВМ с приложением -> **Docker Compose** + конфиг из **`.env`** -> доступ с ПК по **SSH `-L 8080:localhost:8080`** -> **k6** (const VU, смеси 5/95, 50/50, 95/5) -> графики по CPU.
 
 ---
 
@@ -15,10 +15,9 @@
 | Порт | Где | Что |
 |------|-----|-----|
 | **8080** | ВМ / туннель с ПК | HTTP приложения (HTML, REST, Swagger) |
-| **5432** | ВМ | PostgreSQL с хоста |
-| **15432** | ВМ | pgAdmin → `http://<хост>:15432` |
-| **2303** *(пример)* | ПК → ВМ | SSH персональной ВМ (см. таблицу курса) |
-| **2311** *(пример)* | hl03 → k6-ВМ | SSH общей машины с k6 |
+| **5433** | hl12 | PostgreSQL (внешний порт БД для JDBC/psql) |
+| **2303** *(пример)* | ПК -> ВМ | SSH персональной ВМ (см. таблицу курса) |
+| **2311** *(пример)* | hl03 -> k6-ВМ | SSH общей машины с k6 |
 
 ---
 
@@ -27,15 +26,14 @@
 ```bash
 cd ~/lab2_rovnyagin
 cp -n .env.example .env
-# .env: DOCKER_IMAGE_APP; POSTGRES_DB и SPRING_DATASOURCE_URL — одно имя БД (часто hl3)
-docker compose down -v
-docker compose pull app
-docker compose up -d
-docker compose ps
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
+# .env: DBHOST/DBPORT/DBNAME/SCHEMANAME под hl12 и корректные DOCKER_IMAGE_*
+docker compose -f docker-compose.hl12.yml --env-file .env pull
+docker compose -f docker-compose.hl12.yml --env-file .env up -d --force-recreate
+docker compose -f docker-compose.hl12.yml --env-file .env ps
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/api/films
 ```
 
-Логи при падении: `docker compose logs app --tail 80`
+Логи при падении: `docker compose -f docker-compose.hl12.yml --env-file .env logs --tail 80 crud-app additional-app`
 
 ---
 
@@ -58,13 +56,13 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | Переменная | Зачем |
 |------------|--------|
 | `DOCKER_IMAGE_APP` | Образ с Docker Hub |
-| `POSTGRES_DB` + `SPRING_DATASOURCE_URL` | **Одинаковое имя БД** в обоих |
+| `DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME` | Подключение к БД на hl12 |
 | `SPRING_DATASOURCE_USERNAME` / `PASSWORD` | Учётка БД |
 | `SERVER_TOMCAT_THREADS_MAX` | Потоки Tomcat (= `server.tomcat.threads.max`) |
 | `SPRING_JPA_SHOW_SQL` | `false` — тише лог (п. 9 ТЗ) |
-| `APP_CPU_LIMIT` | Лимит CPU контейнера `app` (шаг 0.5 для серии) |
+| `APP_CPU_LIMIT` | Лимит CPU контейнера `crud-app` (шаг 0.5 для серии) |
 
-После смены CPU: `docker compose up -d --force-recreate app`
+После смены CPU: `docker compose -f docker-compose.hl12.yml --env-file .env up -d --force-recreate crud-app`
 
 ---
 
@@ -88,7 +86,7 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 
 **Тяжелее аналитика (опционально):** больше строк в БД — **`./tools/run-seed.sh`** или `COUNT=… ./tools/run-seed.sh` перед серией прогонов (один и тот же объём данных на всю серию).
 
-**ТЗ:** два прогона — **ПК → сервер** (туннель + k6 на ПК) и **сервер → сервер** (k6 там, где корректен `BASE_URL`).
+**ТЗ:** два прогона — **ПК -> сервер** (туннель + k6 на ПК) и **сервер -> сервер** (k6 там, где корректен `BASE_URL`).
 
 ---
 
@@ -102,18 +100,13 @@ export K6_ROUTE=pc-to-server            # или server-to-server — попад
 
 ---
 
-## Файлы лаб. 6
+## Полезные файлы
 
 | Файл | Роль |
 |------|------|
 | `scripts/ssh-tunnel-personal-vm.sh` | Туннель 8080 с ПК на ВМ |
-| `k6/cinema-lab6-constant.js` | постоянные VU; в итерации POST с вероятностью POST_SHARE (как zil LAB6) |
+| `k6/cinema-lab6-constant.js` | постоянные VU; в итерации POST с вероятностью POST_SHARE |
 | `k6/run-lab6-ratio-sweep.sh` | 5/95, 50/50, 95/5 подряд |
 | `k6/plot_k6_cpu_results.py` | PNG из `results/cpu-*` |
 | `k6/remote-k6-sync-and-run.sh` | rsync k6 + запуск на удалённой k6-ВМ |
 
----
-
-## Соответствие ТЗ (ультракратко)
-
-1–3 ВМ, ключи, git, `docker login` — вручную. 4 `docker-compose.yml`. 5 туннель. 6 Swagger. 7 `cpus`/`mem_limit` + `APP_CPU_LIMIT`. 8 env JDBC + Tomcat. 9 `SPRING_JPA_SHOW_SQL`. 10 k6 + графики + два сценария доступа.

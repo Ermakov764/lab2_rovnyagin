@@ -1,9 +1,9 @@
-# Лаб. 8 с БД на hl12 (логика лаб. 7): только CRUD + Additional, без локального Postgres.
-# Переменные DBHOST / DBPORT / DBNAME / SCHEMANAME — как для docker-compose.lab7-app.yml (сеть до hl12 должна быть доступна с ВМ).
+# Сценарий с БД на hl12: только CRUD + Additional, без локального Postgres.
+# Переменные DBHOST / DBPORT / DBNAME / SCHEMANAME — как для app на hl03 с БД на hl12.
 #
 # Пример:
-#   docker compose -f docker-compose.lab8-hl12.yml --env-file .env up -d
-#   docker compose -f docker-compose.lab8-hl12.yml logs crud-app --tail 80
+#   docker compose -f docker-compose.hl12.yml --env-file .env up -d
+#   docker compose -f docker-compose.hl12.yml logs crud-app --tail 80
 #
 # MAIN_CRUD_BASE_URL по умолчанию http://crud-app:8080 — имя сервиса внутри этой же compose-сети.
 
@@ -27,8 +27,6 @@ services:
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
       ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
-      # JVM heap (иначе при k6 + тяжёлый GET сводки возможен OOM и «зависание» acceptor).
-      # Кавычки в .env обязательны для двух и более JVM-флагов.
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms256m -Xmx1152m}
     depends_on:
       additional-app:

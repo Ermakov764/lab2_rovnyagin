@@ -1,12 +1,160 @@
+# Лабораторная работа №8 (Cinema): CRUD + Additional
+
+Репозиторий приведён к текущему сценарию лабораторной №8:
+
+- основной сервис `crud-app` (порт `8080`);
+- дополнительный сервис `additional-app` (порт `8081`);
+- PostgreSQL на отдельной ВМ (`hl12`);
+- запуск через `docker-compose.hl12.yml`.
+
+---
+
+## Что делает проект
+
+### Основной сервис (`crud-app`, `8080`)
+
+- хранит и отдает сущности кинотеатра (`films`, `viewers`, `tickets`);
+- предоставляет публичный API;
+- проксирует аналитическую сводку на `additional-app`.
+
+### Дополнительный сервис (`additional-app`, `8081`)
+
+- забирает данные из `crud-app` по HTTP;
+- считает по каждому фильму день с максимумом уникальных зрителей;
+- отдает сводку списком.
+
+---
+
+## Актуальная структура (важное)
+
+- `docker-compose.hl12.yml` — запуск `crud-app` + `additional-app` (БД на hl12).
+- `.env.example` — шаблон переменных окружения.
+- `additional-service/` — код микросервиса аналитики.
+- `src/` — код основного CRUD.
+- `k6/cinema-constant.js` — k6-сценарий нагрузки.
+- `k6/run-ratio-sweep.sh` — серия прогонов с разными долями POST/GET.
+- `k6/plot-from-results.sh` и `scripts/plot-png.sh` — построение PNG по `results/cpu-*`.
+- `docs/hosts-ports.md` — хосты/порты и подключение.
+- `docs/runtime-one-pager.md` — краткая operational-шпаргалка.
+- `docs/k6-report-png.md` — пояснение по графикам и отчётной части.
+
+---
+
+## Требования
+
+- Docker + Docker Compose plugin;
+- доступ до БД на `hl12` (IP/порт);
+- заполненный `.env` (на базе `.env.example`).
+
+---
+
+## Быстрый старт
+
+```bash
+cp -n .env.example .env
+```
+
+Заполни в `.env` минимум:
+
+- `DOCKER_IMAGE_APP`
+- `DOCKER_IMAGE_ADDITIONAL`
+- `DBHOST`, `DBPORT`, `DBNAME`, `SCHEMANAME`
+- `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
+- `MAIN_CRUD_BASE_URL=http://crud-app:8080`
+
+Запуск:
+
+```bash
+docker compose -f docker-compose.hl12.yml --env-file .env pull
+docker compose -f docker-compose.hl12.yml --env-file .env up -d --force-recreate
+docker compose -f docker-compose.hl12.yml --env-file .env ps
+```
+
+Логи:
+
+```bash
+docker compose -f docker-compose.hl12.yml --env-file .env logs --tail=80 crud-app additional-app
+```
+
+Остановка:
+
+```bash
+docker compose -f docker-compose.hl12.yml --env-file .env down
+```
+
+---
+
+## Проверка API
+
+Проверка CRUD:
+
+```bash
+curl -i "http://localhost:8080/api/films"
+```
+
+Проверка аналитики (через Additional напрямую):
+
+```bash
+curl -i "http://localhost:8081/api/analytics/films/max-viewers-summary"
+```
+
+Проверка аналитики через CRUD-прокси:
+
+```bash
+curl -i "http://localhost:8080/api/cinema/films/max-viewers-summary"
+```
+
+---
+
+## Нагрузка k6
+
+Базовый запуск серии:
+
+```bash
+./k6/run-ratio-sweep.sh
+```
+
+Типовой запуск с меткой CPU:
+
+```bash
+export BASE_URL_MAIN=http://<HOST_OR_IP>:8080
+export BASE_URL_ADDITIONAL=http://<HOST_OR_IP>:8081
+export TARGET_VUS=30
+export RESULT_CPU=0.5
+./k6/run-ratio-sweep.sh
+```
+
+Построение графиков:
+
+```bash
+./k6/plot-from-results.sh
+# или
+./scripts/plot-png.sh 30
+```
+
+---
+
+## Полезные замечания
+
+- В контейнере `localhost` — это сам контейнер. Для вызова CRUD из Additional внутри compose-сети используй `http://crud-app:8080`.
+- Если видишь `Connection refused` сразу после `up -d`, дай сервисам 10-30 секунд на старт и повтори запрос.
+- Если Docker пишет `image ... not found`, проверь теги в `.env`.
+
+---
+
+## Текущий фокус README
+
+Этот README специально сокращён и ориентирован на лабораторную №8 и текущий деплой-сценарий.
+Исторические/архивные сценарии старых лабораторных из README убраны, чтобы не мешать сдаче.
 # Лабораторные №6–8: «Кинотеатр» (Cinema)
 
 Учебный проект: **Spring Boot 4**, **Spring Data JPA**, **PostgreSQL**, **Flyway**, **Docker Compose** (приложение, БД, **pgAdmin**). Предметная область — бронирование билетов (**Film**, **Viewer**, **Ticket**): REST API, HTML-формы, аналитика по билетам. Опциональный профиль **`inmemory`** (без БД).
 
-**Лаб. 6** (текст **`ТЗ_6лаба.txt`**, **`docs/lab6-one-pager.md`**, **`docs/lab6-report-png_k6.md`**): развёртывание на **персональной ВМ**, образ в **Docker Hub**, лимиты **CPU/RAM**, **SSH-туннель** к **8080**, нагрузка **k6**. Раздел **«Лабораторная работа №6»** — подробная шпаргалка по этой работе.
+**Лаб. 6** (текст **`ТЗ_6лаба.txt`**, **`docs/runtime-one-pager.md`**, **`docs/k6-report-png.md`**): развёртывание на **персональной ВМ**, образ в **Docker Hub**, лимиты **CPU/RAM**, **SSH-туннель** к **8080**, нагрузка **k6**. Раздел **«Лабораторная работа №6»** — подробная шпаргалка по этой работе.
 
 **Лаб. 7–8** (тексты **`ТЗ_7лаба.txt`**, **`ТЗ_8лаба.txt`**) — **одна логическая лабораторная** в README:  
-- **Часть 7 — БД на отдельном узле:** **PostgreSQL** на **`hl12.zil`**, приложение на другой ВМ, **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, **`max_connections=1000`**, **`docker-compose.lab7-*.yml`**, туннели к **pgAdmin**.  
-- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; **`docker-compose.lab8.yml`** (локальный Postgres) или **`docker-compose.lab8-hl12.yml`** (БД на hl12, как лаб. 7); два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-lab8-ratio-sweep.sh`**, PNG в **`k6/png_k6/`**.
+- **Часть 7 — БД на отдельном узле:** **PostgreSQL** на **`hl12.zil`**, приложение на другой ВМ, **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`**, **`max_connections=1000`**, туннели к **pgAdmin**.  
+- **Часть 8 — микросервис:** **Additional** (аналитика по **названию** фильма) вызывает основной CRUD по **HTTP** (**`RestTemplate`**), join в **Java**; в этой ветке используется **`docker-compose.hl12.yml`** (БД на hl12, как лаб. 7); два образа в реестре; **k8** как LAB6 **server-server**, CPU **0.5** и **1.0** — **`k6/run-ratio-sweep.sh`**, PNG в **`k6/png_k6/`**.
 
 Раздел **`## Лабораторная работа №7–8`** ниже объединяет обе части (**сначала лаб. 7, затем лаб. 8**).
 
@@ -206,7 +354,7 @@ python3 k6/plot_k6_reports.py --lab6 --title-suffix "ПК → сервер" k6/r
 - Docker + Docker Compose
 - Gradle Wrapper (`./gradlew`)
 - **Лаб. 6 (сдача):** доступ по **SSH** к персональной ВМ курса; на ПК — **Git**, клиент **SSH**; для сценария с общей k6-ВМ — **`rsync`**, **`ssh-copy-id`** (см. **`k6/remote-k6-sync-and-run.sh`**); **Python 3** + **matplotlib** для **`k6/plot_k6_cpu_results.py`**
-- **Лаб. 7–8:** SSH к **персональной ВМ** и при необходимости к **серверу БД** (часто **2312**); **`docker-compose.lab7-app.yml`** / **`docker-compose.lab8.yml`**; см. раздел **«Лабораторная работа №7–8»**
+- **Лаб. 7–8:** SSH к **персональной ВМ** и при необходимости к **серверу БД** (часто **2312**); **`docker-compose.lab7-app.yml`** / **`docker-compose.hl12.yml`**; см. раздел **«Лабораторная работа №7–8»**
 - **Лаб. 4:** [k6](https://k6.io/docs/get-started/installation/) (или Docker-образ `grafana/k6`), Python 3 + `matplotlib` для графика: `pip install "matplotlib>=3.7"`
 - **Лаб. 5:** Python 3.10+; зависимости сидера — `pip install -r tools/requirements-seed.txt` **или** запуск **`./tools/run-seed.sh`** (на Linux при ограничении системного `pip`, PEP 668, скрипт создаёт **`tools/.venv`** и ставит пакеты туда)
 
@@ -287,7 +435,7 @@ curl -s http://localhost:8080/ | grep -i 'Почему сайт' || echo "OK: с
 
 ### `docker` (запуск приложения в контейнере)
 
-- Включается переменной `SPRING_PROFILES_ACTIVE=docker` в сервисе `app` в `docker-compose.yml`
+- Включается переменной `SPRING_PROFILES_ACTIVE=docker` в compose-сервисе приложения (`docker-compose.lab7-app.yml` / `docker-compose.hl12.yml`)
 - В `application-docker.properties` задан JDBC URL на хост БД в сети Compose: `jdbc:postgresql://postgresdb:5432/lab2_db` (логин/пароль те же, что в основном `application.properties`)
 
 ### `inmemory` (режим совместимости)
@@ -494,7 +642,7 @@ docker compose down
 - Кастомный JPQL-запрос -> аналитический запрос в `TicketRepository` для поиска дня с максимальным числом зрителей по фильму.
 - Инициализация схемы и базовых тестовых данных -> Flyway-миграции `V1__create_schema.sql` и `V2__seed_test_data.sql` применяются при старте; при необходимости — доп. сид **лаб. 5** (`tools/seed_rest_data.py`).
 - PostgreSQL-конфигурация -> подключение к PostgreSQL (Docker Compose), в контейнере приложения — профиль `docker` и `application-docker.properties`.
-- Контейнеризация (лаб. 3) -> `Dockerfile` (multi-stage, Java 25), сервис `app` в `docker-compose.yml`.
+- Контейнеризация (лаб. 3) -> `Dockerfile` (multi-stage, Java 25), сервис `app` в compose-файлах приложения.
 Ссылка на шаблон (ветка `feature/spring-boot-data-jpa`): https://bitbucket.org/zil-courses/hl-module1/src/feature/spring-boot-data-jpa/
 ###  Что реализовано:
 -  Контейнеризация Spring Boot (`Dockerfile`) и запуск приложения вместе с БД в `docker compose`
@@ -505,7 +653,7 @@ docker compose down
 - Наполнение БД тестовыми данными через Flyway (`V2`) и при необходимости через Python-скрипт (лаб. 5)
 - Визуальное управление через pgAdmin
   #### Техническая часть
- - Инфраструктура (Docker): PostgreSQL, pgAdmin и приложение в одном `docker-compose.yml`; образ приложения собирается из `Dockerfile`.
+ - Инфраструктура (Docker): приложение в compose; PostgreSQL/pgAdmin на узле БД; образ приложения собирается из `Dockerfile`.
  -  ORM-маппинг (JPA): Hibernate работает в режиме валидации схемы (`ddl-auto=validate`), а создание структуры и базовый сид выполняет Flyway; массовое сидирование — опционально скрипт **лаб. 5**.
  -  Типизация данных: Корректное маппинг Java-типов (LocalDate, LocalTime, Double) на типы данных PostgreSQL (DATE, TIME, DOUBLE PRECISION).
  -  Аналитика (JPQL): Реализация кастомного запроса в репозитории для группировки и поиска дня с максимальной посещаемостью конкретного фильма.
@@ -562,11 +710,8 @@ lab2_rovnyagin/
 │   ├── application.properties       # Конфигурация (хост: localhost), порт, `springdoc.paths-to-match=/api/**`
 │   ├── application-docker.properties # URL БД для контейнера (postgresdb)
 │   └── db/migration/               # Flyway: V1 DDL, V2 DML
-├── docker-compose.yml # postgresdb + app + pgadmin; лаб. 6: limits, env для JDBC/Tomcat/JPA
-├── docker-compose.lab7-db.yml   # Лаб. 7: только Postgres + pgAdmin (узел БД, max_connections=1000)
 ├── docker-compose.lab7-app.yml  # Лаб. 7: только app (DBHOST по умолчанию hl12.zil)
-├── docker-compose.lab8.yml      # Лаб. 8: Postgres + CRUD + Additional (CPU limits на обоих)
-├── docker-compose.lab8-hl12.yml # Лаб. 8: только CRUD + Additional; БД на hl12 (как лаб. 7)
+├── docker-compose.hl12.yml # Сценарий hl12: только CRUD + Additional; БД на hl12
 ├── Dockerfile.additional-service # Лаб. 8: образ только Additional service
 ├── additional-service/           # Лаб. 8: второй Spring Boot (RestTemplate → CRUD)
 ├── .env.example        # Шаблон переменных для Compose (скопировать в .env)
@@ -827,7 +972,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 
 ## Лабораторная работа №6: ВМ, Docker, env, лимиты ресурсов, SSH, k6
 
-Текст задания: **`ТЗ_6лаба.txt`**. Одностраничная шпаргалка (порты, команды, env, k6): **`docs/lab6-one-pager.md`**. Пример текстового отчёта по графикам **`png_k6/`** с отсылками к пунктам ТЗ: **`docs/lab6-report-png_k6.md`**. Ниже — что уже **реализовано в репозитории** и как этим пользоваться на сервере и локально.
+Текст задания: **`ТЗ_6лаба.txt`**. Одностраничная шпаргалка (порты, команды, env, k6): **`docs/runtime-one-pager.md`**. Пример текстового отчёта по графикам **`png_k6/`** с отсылками к пунктам ТЗ: **`docs/k6-report-png.md`**. Ниже — что уже **реализовано в репозитории** и как этим пользоваться на сервере и локально.
 
 ### Быстрый запуск лаб. 6 «с нуля» (одна шпаргалка)
 
@@ -865,7 +1010,7 @@ WHERE film_id = 1 AND session_date = '2026-04-25';
 - **Сервер на сервер**: на машине, откуда виден API (часто та же ВМ или общая k6-ВМ),  
   `export BASE_URL=http://127.0.0.1:8080` (или **`http://<IP_приложения>:8080`**) и снова **`./k6/run-lab6-ratio-sweep.sh`**.  
 - Серия по CPU: на ВМ в **`.env`** меняете **`APP_CPU_LIMIT`** (0.5, 1.0, 1.5, 2), **`docker compose up -d --force-recreate app`**, после каждого — sweep с **`RESULT_CPU=0.5`** … **`2`**.  
-- Графики: см. подраздел **«Полный порядок: hl03 + k6-ВМ + ПК»** и **`scripts/lab6-sync-png-from-k6-vm.sh`**; вручную: **`python3 k6/plot_k6_cpu_results.py results -o png_k6 --vus <N>`** (нужен **matplotlib**).
+- Графики: см. подраздел **«Полный порядок: hl03 + k6-ВМ + ПК»**; вручную: **`python3 k6/plot_k6_cpu_results.py results -o png_k6 --vus <N>`** (нужен **matplotlib**).
 
 **D. Локально на ПК без ВМ (только разработка)**  
 ```bash
@@ -883,11 +1028,11 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 |------|----------------|------------|
 | Приложение | персональная ВМ (**hl03**) | **`docker compose`** только в **корне клона** (`~/lab2_rovnyagin`), не в `~/` и **не** на k6-ВМ. Лимит CPU — **`APP_CPU_LIMIT`** в **`.env`**. |
 | Нагрузка | k6-ВМ (**hl11** и т.д.) | Репозиторий или зеркало в **`~/ermakov_k6`**, в **`PATH`** есть **`k6`**. Сюда же складываются **`results/cpu-*`**. |
-| Отчёт | ПК | **`scripts/lab6-sync-png-from-k6-vm.sh`**, Python + **matplotlib**. |
+| Отчёт | ПК | Python + **matplotlib** (построение из локального **`results/`**). |
 
 **Связка CPU и папок `results/cpu-*`:** в каждой точке серии **сначала** на hl03 выставляете **`APP_CPU_LIMIT`** (0.5 → 1.0 → 1.5 → 2), **пересоздаёте** контейнер приложения, **затем** на k6-ВМ запускаете sweep с **тем же** **`RESULT_CPU`**. Нельзя четыре раза вызвать sweep подряд без смены лимита на Docker — иначе метки **`cpu-*`** не соответствуют реальному CPU.
 
-**Шаг 1 — Один ярус CPU (hl03, каталог с `docker-compose.yml`):**
+**Шаг 1 — Один ярус CPU (hl03, каталог с `docker-compose.hl12.yml`):**
 
 ```bash
 cd ~/lab2_rovnyagin
@@ -927,7 +1072,7 @@ export K6_REMOTE_DIR=ermakov_k6
 export BASE_URL=http://<URL_как_в_k6>
 export K6_ROUTE=server-to-server
 export LAB6_PLOT_VUS=400
-./scripts/lab6-sync-png-from-k6-vm.sh
+python3 k6/plot_k6_cpu_results.py results -o png_k6 --vus "${LAB6_PLOT_VUS}"
 ```
 
 - **`LAB6_PLOT_VUS`** должен совпадать с **`TARGET_VUS`** в именах JSON. Если в какой-то папке **`cpu-*`** есть только **`*-vus-30.json`**, а вы указали **400**, построение графиков завершится ошибкой — нужно догнать прогоны на k6-ВМ.
@@ -984,7 +1129,7 @@ export LAB6_PLOT_VUS=400
 | k6: много **4xx/5xx** на GET аналитики | Нет билетов / неверный **`FILM_ID`** | Flyway **V2**, **`./tools/run-seed.sh`**, проверить **`GET /api/films`**. |
 | Забыли, какие JSON уже относились к какому CPU | Не задавали **`RESULT_CPU`** | Перегонять sweep с **`RESULT_CPU=0.5`** … для каждого лимита — скрипт раскладывает по **`results/cpu-*`**. |
 | k6: **`connection refused`** на **`http://…:8080`** | **`BASE_URL`** не тот для машины, где запущен k6; приложение не поднято; неверный IP между подсетями | Проверить **`curl`** **с той же ВМ, что и k6**; **`docker compose ps`** на hl03; IP взять с **`hostname -I`** на ВМ приложения. |
-| **`docker compose`: no configuration file** | Команда не из каталога с **`docker-compose.yml`** | **`cd ~/lab2_rovnyagin`** (или ваш путь к клону). На **k6-ВМ** compose приложения обычно **не** запускают. |
+| **`docker compose`: no configuration file** | Команда не из каталога с compose-файлом (в этой ветке: **`docker-compose.hl12.yml`**) | **`cd ~/lab2_rovnyagin`** (или ваш путь к клону). На **k6-ВМ** compose приложения обычно **не** запускают. |
 | plot: нет **`*-vus-400.json`** в части **`cpu-*`** | На k6-ВМ не все прогоны при **`TARGET_VUS=400`** | Догнать sweep для недостающих **`RESULT_CPU`** или рисовать **`LAB6_PLOT_VUS=30`**, если полная серия только на 30. |
 
 **Микро-шпаргалка команд «всё остановить и поднять чисто» (на ВМ, в каталоге проекта):**
@@ -1006,7 +1151,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | **1** | ВМ, порт из таблицы курса, обновление ОС | Выполняете на ВМ; в репозитории не фиксируется. |
 | **2** | Свой `id_rsa.pub` в `authorized_keys`; не менять пароли `hl` / `root` | На ВМ; см. раздел «Подготовка на ВМ». |
 | **3** | Git, ключ в GitHub, clone, `docker login` | На ВМ; образ задаётся **`DOCKER_IMAGE_APP`** (см. ниже). |
-| **4** | Развернуть в Docker Compose | **`docker-compose.yml`**: `postgresdb`, `app`, `pgadmin`. |
+| **4** | Развернуть в Docker Compose | **`docker-compose.hl12.yml`**: `crud-app`, `additional-app` (БД на hl12). |
 | **5** | SSH `-L 8080:localhost:8080` | Скрипт **`scripts/ssh-tunnel-personal-vm.sh`** и команда в разделе «SSH-туннель». |
 | **6** | Проверка приложения, Swagger | **`OpenApiConfig`**, SpringDoc: **`/swagger-ui.html`**, **`/v3/api-docs`**. |
 | **7** | Явно CPU/RAM контейнера приложения | У сервиса **`app`**: **`cpus`** и **`mem_limit`** из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`** (лимиты без Swarm; см. **`docker inspect`** ниже). |
@@ -1016,10 +1161,10 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 
 ### Как в коде и скриптах выполнена лабораторная 6
 
-- **Контейнеризация и конфигурация:** в **`docker-compose.yml`** у сервиса **`app`** заданы лимиты **CPU/RAM** (**`cpus`**, **`mem_limit`** — так они гарантированно применяются при **`docker compose up`**), все чувствительные параметры приложения и БД пробрасываются через **`.env`** / **`environment`** (JDBC, Tomcat, JPA, образ Hub).
+- **Контейнеризация и конфигурация:** в compose-файлах приложения заданы лимиты **CPU/RAM** (`cpus`, `memory`), все чувствительные параметры приложения и БД пробрасываются через **`.env`** / **`environment`** (JDBC, Tomcat, JPA, образ Hub).
 - **Доступ с ПК к приложению на ВМ:** отдельный скрипт **`scripts/ssh-tunnel-personal-vm.sh`** повторяет требование ТЗ **`ssh -L 8080:localhost:8080`** (с учётом нестандартного SSH-порта курса).
 - **Нагрузка по ТЗ п. 10:** **`k6/cinema-lab6-constant.js`** — **фиксированное число VU** и **`duration`**; в каждой итерации с вероятностью **`POST_SHARE`** выполняется **POST** `/api/films`, иначе **GET** аналитики (та же идея, что **`load.js`** одногруппницы с **`LAB6_CONST=1`**). **`k6/run-lab6-ratio-sweep.sh`** три раза подряд меняет **`POST_SHARE`** (5/95, 50/50, 95/5). Дальше — **`plot_k6_reports.py --lab6`** или **`plot_k6_cpu_results.py`** по **`results/cpu-*`**.
-- **С ПК без ручного копирования JSON:** **`scripts/lab6-sync-png-from-k6-vm.sh`** подтягивает **`results/cpu-*`** с k6-ВМ, при необходимости дописывает **`lab6_meta`**, строит **`png_k6/*.png`** (**`LAB6_PLOT_VUS`** = **`--vus`**).
+- **С ПК без ручного копирования JSON:** используйте **`scripts/sync-results-from-k6-vm.sh`** для синка **`results/cpu-*`** с k6-ВМ, затем стройте PNG локально через **`k6/plot_k6_cpu_results.py`**.
 - **Автоматизация полного цикла лаб. 6 (опционально):** **`k6/lab6-full-automation.sh`** на персональной ВМ меняет CPU в **`.env`**, пересоздаёт контейнер приложения, синхронизирует k6 на общую ВМ и забирает результаты; **`k6/remote-k6-sync-and-run.sh`** — только выгрузка каталога **`k6/`** и запуск прогона по SSH на машине с установленным **k6**.
 
 ### k6: актуальные файлы (лаб. 8) и вспомогательные скрипты
@@ -1027,15 +1172,13 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | Файл | Назначение |
 |------|------------|
 | **`scripts/ssh-tunnel-personal-vm.sh`** | Запуск на **ПК**: SSH с **`-L 8080:localhost:8080`** к персональной ВМ (по умолчанию порт SSH **2303**). |
-| **`k6/cinema-lab8-constant.js`** | Лаб. 8: **POST** `/api/viewers`, **GET** сводки; метрики **`post_ms`** / **`get_ms`**. |
-| **`k6/run-lab8-ratio-sweep.sh`** | Три прогона смесей; JSON в **`k6/reports/`**; при **`RESULT_CPU`** — **`results/cpu-*`**. |
-| **`k6/plot-lab8-from-results.sh`** | **`plot_k6_cpu_results.py`** с **`lab8-summary`**; по умолчанию вывод в **`k6/png_k6/`**. |
-| **`k6/plot_k6_cpu_results.py`** | PNG из **`results/cpu-*`** (**`--summary-prefix lab8-summary`** или **`lab6-summary`**). |
-| **`scripts/lab6-sync-png-from-k6-vm.sh`** | **rsync** **`results/`** с k6-ВМ → **`./results/`**, затем plot (для лаб. 8 после pull удобнее **`plot-lab8-from-results.sh`**). |
-| **`scripts/lab6-get-png-from-k6-vm.sh`** | Обёртка над **`lab6-sync-png-from-k6-vm.sh`**. |
-| **`scripts/sync-results-from-k6-vm.sh`** | Только синк **`results/`**; дальше например **`scripts/lab8-plot-png.sh`**. |
-| **`scripts/lab8-plot-png.sh`** | Plot лаб. 8 → **`k6/png_k6/`** по локальным **`results/cpu-*`**. |
-| **`ТЗ_6лаба.txt`**, **`docs/lab6-*.md`** | Материалы лаб. 6; сценарии **`cinema-lab6`** / **`run-lab6`** из репозитория убраны — для лаб. 8 не нужны. |
+| **`k6/cinema-constant.js`** | Constant-load: **POST** `/api/viewers`, **GET** сводки; метрики **`post_ms`** / **`get_ms`**. |
+| **`k6/run-ratio-sweep.sh`** | Три прогона смесей; JSON в **`k6/reports/`**; при **`RESULT_CPU`** — **`results/cpu-*`**. |
+| **`k6/plot-from-results.sh`** | **`plot_k6_cpu_results.py`** с префиксом **`summary`**; по умолчанию вывод в **`k6/png_k6/`**. |
+| **`k6/plot_k6_cpu_results.py`** | PNG из **`results/cpu-*`** (`--summary-prefix summary`). |
+| **`scripts/sync-results-from-k6-vm.sh`** | Только синк **`results/`**; дальше например **`scripts/plot-png.sh`**. |
+| **`scripts/plot-png.sh`** | Plot → **`k6/png_k6/`** по локальным **`results/cpu-*`**. |
+| **`ТЗ_6лаба.txt`**, **`docs/runtime-one-pager.md`**, **`docs/k6-report-png.md`** | Материалы по нагрузке и отчётности. |
 | **`.env.example`** | Шаблон переменных для Compose. |
 
 ### Порты: что куда стучится
@@ -1044,7 +1187,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 |----------------------------------------|------------------|--------|
 | **8080** | Публикует сервис **`app`** (`8080:8080`) | HTTP: HTML, REST, Swagger. На **ПК** тот же номер часто занят **SSH-туннелем** к ВМ — тогда локальный Docker на 8080 одновременно не поднять. |
 | **5432** | **`postgresdb`** | PostgreSQL с хоста (для **psql**, DBeaver и т.д.). Внутри сети Compose приложение ходит на хост **`postgresdb`**, не `localhost`. |
-| **15432** | **`pgadmin`** (`15432:80`) | Веб-интерфейс pgAdmin: **`http://localhost:15432`** (логин/пароль из **`docker-compose.yml`**). |
+| **15432** | **pgAdmin на узле БД** | Веб-интерфейс pgAdmin (если поднят на hl12 отдельным DB-стеком). |
 | **SSH к персональной ВМ** | Из [таблицы курса](https://docs.google.com/spreadsheets/) (пример **2303**) | Не HTTP: вход **`ssh -p <порт> hl@…`**. |
 | **SSH к общей k6-ВМ** | В примерах скриптов часто **2311** | Отдельный форвард курса для машины с **k6**; не путать с портом персональной ВМ. |
 
@@ -1057,7 +1200,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | Переменная | Где | Смысл |
 |------------|-----|--------|
 | **`DOCKER_IMAGE_APP`** | `app` | Полное имя образа на Docker Hub (`логин/репозиторий:тег`). На ВМ после **`docker compose pull app`** поднимается этот образ без сборки Gradle. |
-| **`SPRING_PROFILES_ACTIVE`** | задано в **`docker-compose.yml`** как `docker` | Включает настройки из **`application-docker.properties`** и согласованное поведение с БД в контейнере. В **`.env`** обычно не дублируют. |
+| **`SPRING_PROFILES_ACTIVE`** | задано в compose-файлах приложения как `docker` | Включает настройки из **`application-docker.properties`** и согласованное поведение с БД. В **`.env`** обычно не дублируют. |
 
 **PostgreSQL (инициализация контейнера `postgresdb`)**
 
@@ -1090,9 +1233,9 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 | **`BASE_URL`** | Базовый URL API для k6 (с ПК через туннель часто **`http://127.0.0.1:8080`**; с k6-ВМ — URL, **доступный с той машины**, например **`http://10.x.x.x:8080`**). |
 | **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`** | Постоянное число виртуальных пользователей, длительность ступени, id фильма для аналитики. |
 | **`RESULT_CPU`** | Метка для копирования JSON в **`results/cpu-0.5`** … **`cpu-2`** после sweep. |
-| **`LAB6_PLOT_VUS`** | Для **`scripts/lab6-sync-png-from-k6-vm.sh`**: какой **`TARGET_VUS`** выбрать в именах файлов (**`--vus`** у **`plot_k6_cpu_results.py`**). |
+| **`LAB6_PLOT_VUS`** | Какой **`TARGET_VUS`** выбрать при построении графика (**`--vus`** у **`plot_k6_cpu_results.py`**). |
 | **`LAB6_SKIP_LOCAL_APP_CHECK`** | Для **`k6/remote-k6-sync-and-run.sh`**: не выполнять **`curl`** до **`BASE_URL`** с машины запуска (ПК вне сети приложения). |
-| **`K6_SSH_HOST`**, **`K6_SSH_PORT`**, **`K6_SSH_USER`**, **`K6_REMOTE_DIR`** | Для **`remote-k6-sync-and-run.sh`** / **`lab6-full-automation.sh`** / **`lab6-sync-png-from-k6-vm.sh`**: доступ по SSH к машине с k6. |
+| **`K6_SSH_HOST`**, **`K6_SSH_PORT`**, **`K6_SSH_USER`**, **`K6_REMOTE_DIR`** | Для **`remote-k6-sync-and-run.sh`** / **`lab6-full-automation.sh`** / **`sync-results-from-k6-vm.sh`**: доступ по SSH к машине с k6. |
 
 ### Пошагово: подключиться к ВМ и запустить стек
 
@@ -1152,7 +1295,7 @@ docker compose up -d
 - Устно: выполнен **`docker login`**; в **`.env`** указан ваш **`DOCKER_IMAGE_APP`**.
 
 **2. Пункт 4 (Compose)**  
-- Файл **`docker-compose.yml`** из репозитория (уже с тремя сервисами).  
+- Файл **`docker-compose.hl12.yml`** из репозитория (два сервиса приложения).  
 - Скрин или текст вывода на ВМ:
   ```bash
   docker compose ps
@@ -1164,7 +1307,7 @@ docker compose up -d
 - Либо вывод на ПК: **`curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/swagger-ui.html`** (часто **302** — нормально).
 
 **4. Пункт 7 (лимиты CPU/RAM)**  
-- Фрагмент **`docker-compose.yml`** у **`app`**: ключи **`cpus`** и **`mem_limit`** (подставляются из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`**).  
+- Фрагмент compose у **`crud-app`**: ключи **`cpus`** и **`memory`** (подставляются из **`APP_CPU_LIMIT`** / **`APP_MEMORY_LIMIT`**).  
 - Дополнительно на ВМ (показывает фактические лимиты у контейнера):
   ```bash
   docker inspect lab2_app --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'
@@ -1198,7 +1341,7 @@ docker compose up -d
 
 ### Образ приложения в Docker Hub (сборка → push, на сервере → pull)
 
-Сервис **`app`** в **`docker-compose.yml`** использует **`image: ${DOCKER_IMAGE_APP:-…}`** и **`build:`**: локально (или в CI) образ **собирается и тегируется** тем же именем, что потом пушится в Hub; **на учебной ВМ** достаточно **`git pull`** репозитория (compose-файл + `.env`), **`docker login`** и подтянуть образ **без сборки Gradle на сервере**.
+Сервис **`crud-app`** в **`docker-compose.hl12.yml`** использует **`image: ${DOCKER_IMAGE_APP:-…}`**: на учебной ВМ достаточно **`git pull`** репозитория (compose-файл + `.env`), **`docker login`** и подтянуть образ **без сборки Gradle на сервере**.
 
 1. На [Docker Hub](https://hub.docker.com/) создайте **публичный** репозиторий, например **`lab2_rovnyagin`** (имя должно совпадать с путём образа).
 2. В **`.env`** задайте **`DOCKER_IMAGE_APP=<ваш_логин>/lab2_rovnyagin:latest`** (по умолчанию в репозитории указан пример **`lavrentiyermakov/lab2_rovnyagin:latest`** — замените логин при необходимости).
@@ -1218,7 +1361,7 @@ docker compose up -d
 
 ### Docker Compose: лимиты CPU/RAM и переменные окружения
 
-В **`docker-compose.yml`** для сервиса **`app`** задано:
+В compose-файле приложения для сервиса **`crud-app`** задано:
 
 - **`cpus`** и **`mem_limit`** — жёсткие лимиты для обычного **`docker compose up`** (без Swarm). Раньше использовалась секция **`deploy.resources`**; на части установок она **не доходила** до контейнера, из‑за чего серия **`APP_CPU_LIMIT`** не меняла реальную квоту CPU и графики лаб. 6 выглядели «ломано» по сравнению с одногруппниками.
 - Переопределение через **`.env`** (шаблон — **`.env.example`**) или экспорт перед `docker compose up`:
@@ -1267,7 +1410,7 @@ OpenAPI/Swagger уже подключены (**`/swagger-ui.html`**, **`/v3/api-
 - Сценарий: **`k6/cinema-lab6-constant.js`**
 - Три прогона подряд: **`./k6/run-lab6-ratio-sweep.sh`** (результаты: **`k6/reports/lab6-summary-*.json`**)
 - Серия CPU: после каждого значения **`APP_CPU_LIMIT`** (шаг **0.5**) задайте **`RESULT_CPU`** при прогоне sweep — JSON попадут в **`results/cpu-0.5`**, **`cpu-1.0`**, … (см. скрипт). Подробный порядок — **«Полный порядок: hl03 + k6-ВМ + ПК»** выше.
-- Графики для отчёта: с ПК **`./scripts/lab6-sync-png-from-k6-vm.sh`** (переменные **`LAB6_PLOT_VUS`**, **`K6_SSH_*`**, **`BASE_URL`** для inject) или вручную **`python3 k6/plot_k6_cpu_results.py <каталог_results> -o png_k6 --vus <N>`**.
+- Графики для отчёта: с ПК сначала **`./scripts/sync-results-from-k6-vm.sh`**, затем **`python3 k6/plot_k6_cpu_results.py <каталог_results> -o png_k6 --vus <N>`**.
 
 Переменные: **`BASE_URL`**, **`TARGET_VUS`**, **`DURATION`**, **`FILM_ID`**, **`K6_ROUTE`**, **`RESULT_CPU`** (в БД должны быть билеты на этот фильм — Flyway **`V2`** или сидер лаб. 5).
 
@@ -1348,12 +1491,12 @@ spring.datasource.url=jdbc:postgresql://${DBHOST:localhost}:${DBPORT:5432}/${DBN
 
 - Синтаксис **`${ИМЯ:значение_если_нет_переменной}`**: если в окружении контейнера / JVM задана переменная **`ИМЯ`**, подставляется она; иначе — текст после двоеточия. На лаб. 7 вы **явно** задаёте **`DBHOST`**, **`DBPORT`**, **`DBNAME`**, **`SCHEMANAME`** в **`.env`**, чтобы попасть в **свою** базу из таблицы.
 - В **репозитории** для локальной работы без Docker в **`application.properties`** по умолчанию **`DBNAME=lab2_db`**, **`SCHEMANAME=public`**, **`DBHOST=localhost`** — это удобнее, чем тащить **`hl*`** на ноутбук.
-- В **`application-docker.properties`** (профиль **`docker`**, который включает **`docker-compose.yml`**) **`DBHOST`** по умолчанию **`postgresdb`** — это **DNS-имя сервиса Postgres внутри одной сети compose**. На **лаб. 7** приложение живёт **без** локального Postgres, поэтому **`DBHOST`** обязан указывать на **узел hl12** (или его IP), а не на **`postgresdb`**; при необходимости строку целиком переопределяют **`SPRING_DATASOURCE_URL`** в **`docker-compose.lab7-app.yml`**.
+- В **`application-docker.properties`** (профиль **`docker`**) **`DBHOST`** может по умолчанию быть локальным именем сервиса БД, но для текущего сценария (БД на hl12) **`DBHOST`** обязан указывать на **узел hl12** (или его IP); при необходимости строку целиком переопределяют **`SPRING_DATASOURCE_URL`** в compose.
 - Хвост **`?currentSchema=${SCHEMANAME:…}`** задаёт **схему по умолчанию** для JDBC-сессии. В проекте Flyway и Hibernate тоже используют **`SCHEMANAME`**; если преподаватель требует схему не **`public`**, выставьте **`SCHEMANAME`** согласованно с миграциями.
 
 ### Фрагмент Compose по ТЗ (`max_connections`)
 
-Требование ТЗ — запускать Postgres с **`postgres -c max_connections=1000`**. В **`docker-compose.lab7-db.yml`** это выражено так:
+Требование ТЗ — запускать Postgres с **`postgres -c max_connections=1000`**. В текущей ветке это относится к отдельному DB-стеку на hl12.
 
 ```yaml
 command: ["postgres", "-c", "max_connections=1000"]
@@ -1375,9 +1518,9 @@ command: ["postgres", "-c", "max_connections=1000"]
 
 | Файл | Назначение |
 |------|------------|
-| **`docker-compose.lab7-db.yml`** | Эталон «только узел БД»: **postgres** с **`max_connections=1000`**, **pgAdmin**, том **`lab7_postgres_data`**, порт Postgres на хосте **`POSTGRES_PUBLISH_PORT`** (по умолчанию **5432**). Имеет смысл, если вы **сами** поднимаете БД на **`hl12`**. |
+| **DB-стек на hl12 (вне этой ветки)** | «Только узел БД»: **postgres** с **`max_connections=1000`**, **pgAdmin**, публикация порта Postgres на хосте. Имеет смысл, если вы **сами** поднимаете БД на **`hl12`**. |
 | **`docker-compose.lab7-app.yml`** | Только **`app`**: **`DBHOST`** по умолчанию **`hl12.zil`**, **`DBPORT`** по умолчанию **5432**. Нет **`depends_on`** к локальному Postgres. Для образов с Docker Hub добавлена **`SPRING_DATASOURCE_URL`** в **`environment`**, чтобы JDBC брался из **`.env`** при **`docker compose up`** (иначе старый образ мог по умолчанию стучаться в **`postgresdb`**). |
-| **`docker-compose.yml`** | Полный стек на **одной** машине (лаб. 6, отладка): **postgresdb**, **app**, **pgAdmin**; у Postgres тоже **`max_connections=1000`**. |
+| **`docker-compose.hl12.yml`** | Текущий рабочий стек на **hl03**: **crud-app** + **additional-app**; БД на **hl12**. |
 
 ### Конфигурация Spring (где «прописывается» URL)
 
@@ -1389,7 +1532,7 @@ command: ["postgres", "-c", "max_connections=1000"]
 
 | Переменная | Что задаёт | Типичная ошибка |
 |------------|------------|-----------------|
-| **`DBHOST`** | Хост **с точки зрения контейнера app**: IP **hl12** (напр. **`10.60.3.9`**) или **`hl12.zil`**, если DNS с ВМ приложения резолвится. | Оставить **`postgresdb`** — это только для локального **`docker-compose.yml`** с сервисом Postgres рядом с app. |
+| **`DBHOST`** | Хост **с точки зрения контейнера app**: IP **hl12** (напр. **`10.60.3.9`**) или **`hl12.zil`**, если DNS с ВМ приложения резолвится. | Оставить локальное имя сервиса БД — ошибка для текущего сценария с БД на hl12. |
 | **`DBPORT`** | Порт **на хосте hl12**, который проброшен на Postgres (**часто `5433`**, см. **`5433:5432`** в compose). | Путать с **5432**: внутри контейнера БД слушает **5432**, снаружи на ВМ приложения вы стучитесь в **опубликованный** порт (**5433** и т. д.). |
 | **`DBNAME`** | Имя базы **из таблицы** (**`hl1`…`hl10`**). | Взять чужую базу или опечататься — приложение подключится не к той БД. |
 | **`SCHEMANAME`** | Схема внутри выбранной БД (**часто `public`**). | Несовпадение с тем, что ожидают миграции Flyway → ошибки при старте. |
@@ -1430,7 +1573,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 На машине **`hl12`** (или аналоге):
 
 ```bash
-docker compose -f docker-compose.lab7-db.yml --env-file .env up -d
+DB-стек на hl12 поднимается отдельным compose-файлом на узле БД (в этой ветке файл не хранится).
 ```
 
 В **`.env`**: **`POSTGRES_*`**, при необходимости **`POSTGRES_PUBLISH_PORT`**. Затем на ВМ приложения — как выше, с **`DBHOST`** / **`DBPORT`**, ведущими на этот хост.
@@ -1464,7 +1607,7 @@ ssh -p 2312 -N -L 5051:127.0.0.1:5051 hl@hlssh.zil.digital
 | Пункт ТЗ | Как показано |
 |----------|----------------|
 | БД на отдельном узле, в контейнере | Postgres на **hl12**, приложение на **персональной ВМ**. |
-| Compose: БД + pgAdmin, **`max_connections=1000`** | В **`docker-compose.lab7-db.yml`** / **`docker-compose.yml`**; на общем стенде — в чужом compose на **hl12**. |
+| Compose: БД + pgAdmin, **`max_connections=1000`** | В отдельном DB-стеке на **hl12**; на общем стенде — в compose узла БД. |
 | **`application.properties`**: JDBC через **`DBHOST`**, **`DBPORT`**, **`DBNAME`**, **`SCHEMANAME`** | **`application.properties`** + переменные **`.env`**; при необходимости **`SPRING_DATASOURCE_URL`** в **`docker-compose.lab7-app.yml`**. |
 | Имя БД из таблицы | Например **`hl3`** в **`DBNAME`**. |
 
@@ -1543,17 +1686,10 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
 docker build -f Dockerfile.additional-service -t "$DOCKER_IMAGE_ADDITIONAL" .
 ```
 
-Локально «два сервиса + Postgres»:
-
-```bash
-docker compose -f docker-compose.lab8.yml --env-file .env up -d --build
-# CRUD :8080, Additional :8081, лимиты CPU: APP_CPU_LIMIT / ADDITIONAL_CPU_LIMIT
-```
-
 **БД на hl12** (без локального Postgres — как лаб. 7): **`DBHOST` / `DBPORT` / `DBNAME` / `SCHEMANAME`** как для **`docker-compose.lab7-app.yml`**, затем:
 
 ```bash
-docker compose -f docker-compose.lab8-hl12.yml --env-file .env up -d
+docker compose -f docker-compose.hl12.yml --env-file .env up -d
 ```
 
 В **`.env.example`** ищите **`DOCKER_IMAGE_ADDITIONAL`**, порты **`ADDITIONAL_PUBLISH_PORT`**.
@@ -1569,18 +1705,18 @@ export K6_ROUTE=server-to-server
 export TARGET_VUS=400
 export FILM_TITLE=Интерстеллар
 export RESULT_CPU=0.5
-./k6/run-lab8-ratio-sweep.sh
+./k6/run-ratio-sweep.sh
 ```
 
-Повторить с **1.0** vCPU и **`RESULT_CPU=1.0`**. В **`results/`** должны быть **`cpu-0.5/`** и **`cpu-1.0/`** с **`lab8-summary-*.json`**.
+Повторить с **1.0** vCPU и **`RESULT_CPU=1.0`**. В **`results/`** должны быть **`cpu-0.5/`** и **`cpu-1.0/`** с **`summary-*.json`**.
 
-Графики (как LAB6, но префиксы lab8):
+Графики:
 
 ```bash
 python3 k6/plot_k6_cpu_results.py results -o k6/png_k6 \
-  --summary-prefix lab8-summary --vus 400 \
+  --summary-prefix summary --vus 400 \
   --title-tag "Лаб. 8 (Additional→CRUD)" \
-  --png-prefix lab8-vs-cpu \
+  --png-prefix vs-cpu \
   --post-legend "POST /api/viewers (среднее, мс)" \
   --get-legend "GET Additional→CRUD (среднее, мс)"
 ```
@@ -1756,7 +1892,7 @@ USE_DOCKER_K6=1 BASE_URL=http://host.docker.internal:8080 ./k6/run-sweep.sh
 - **Port:** `5432`
 
 **PostgreSQL (для добавления сервера в pgAdmin):**
-- **Host name/address:** `postgresdb` (имя сервиса в `docker-compose.yml`)
+- **Host name/address:** хост/имя сервиса PostgreSQL в DB-стеке на hl12 (часто `postgresdb`)
 - **Port:** `5432`
 - **Maintenance DB:** `lab2_db`
 - **Username:** `postgres`
