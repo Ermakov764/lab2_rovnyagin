@@ -3,6 +3,7 @@ package ru.hse.lab2.repository.jpa;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import ru.hse.lab2.entity.Ticket;
+import ru.hse.lab2.observability.ObservabilityService;
 import ru.hse.lab2.repository.TicketRepository;
 import ru.hse.lab2.service.port.TicketStore;
 
@@ -16,51 +17,54 @@ import java.util.Optional;
 public class JpaTicketStore implements TicketStore {
 
     private final TicketRepository ticketRepository;
+    private final ObservabilityService observabilityService;
 
-    public JpaTicketStore(TicketRepository ticketRepository) {
+    public JpaTicketStore(TicketRepository ticketRepository, ObservabilityService observabilityService) {
         this.ticketRepository = ticketRepository;
+        this.observabilityService = observabilityService;
     }
 
     @Override
     public List<Ticket> findAll() {
-        return ticketRepository.findAll();
+        return timed("db.JpaTicketStore.findAll", ticketRepository::findAll);
     }
 
     @Override
     public List<Ticket> findByFilmId(Long filmId) {
-        return ticketRepository.findByFilm_Id(filmId);
+        return timed("db.JpaTicketStore.findByFilmId", () -> ticketRepository.findByFilm_Id(filmId));
     }
 
     @Override
     public Optional<Ticket> findById(Long id) {
-        return ticketRepository.findById(id);
+        return timed("db.JpaTicketStore.findById", () -> ticketRepository.findById(id));
     }
 
     @Override
     public Ticket save(Ticket ticket) {
-        return ticketRepository.save(ticket);
+        return timed("db.JpaTicketStore.save", () -> ticketRepository.save(ticket));
     }
 
     @Override
     public void delete(Ticket ticket) {
-        ticketRepository.delete(ticket);
+        timedVoid("db.JpaTicketStore.delete", () -> ticketRepository.delete(ticket));
     }
     
     @Override
     public void deleteByFilmId(Long filmId) {
-        ticketRepository.deleteByFilm_Id(filmId);
+        timedVoid("db.JpaTicketStore.deleteByFilmId", () -> ticketRepository.deleteByFilm_Id(filmId));
     }
     
     @Override
     public void deleteByViewerId(Long viewerId) {
-        ticketRepository.deleteByViewer_Id(viewerId);
+        timedVoid("db.JpaTicketStore.deleteByViewerId", () -> ticketRepository.deleteByViewer_Id(viewerId));
     }
 
     @Override
     public boolean existsByFilmSessionAndSeat(Long filmId, LocalDate sessionDate, LocalTime sessionTime, String seatNumber) {
-        return ticketRepository.existsByFilm_IdAndSessionDateAndSessionTimeAndSeatNumber(
-                filmId, sessionDate, sessionTime, seatNumber
-        );
+        return timed("db.JpaTicketStore.existsByFilmSessionAndSeat",
+                () -> ticketRepository.existsByFilm_IdAndSessionDateAndSessionTimeAndSeatNumber(
+                        filmId, sessionDate, sessionTime, seatNumber
+                ));
     }
 
     @Override
@@ -71,18 +75,44 @@ public class JpaTicketStore implements TicketStore {
             String seatNumber,
             Long id
     ) {
-        return ticketRepository.existsByFilm_IdAndSessionDateAndSessionTimeAndSeatNumberAndIdNot(
-                filmId, sessionDate, sessionTime, seatNumber, id
-        );
+        return timed("db.JpaTicketStore.existsByFilmSessionAndSeatAndIdNot",
+                () -> ticketRepository.existsByFilm_IdAndSessionDateAndSessionTimeAndSeatNumberAndIdNot(
+                        filmId, sessionDate, sessionTime, seatNumber, id
+                ));
     }
 
     @Override
     public List<Object[]> findDailyViewerStatsByFilmId(Long filmId) {
-        return ticketRepository.findDailyViewerStatsByFilmId(filmId);
+        return timed("db.JpaTicketStore.findDailyViewerStatsByFilmId",
+                () -> ticketRepository.findDailyViewerStatsByFilmId(filmId));
     }
 
     @Override
     public List<Object[]> findTopFilmByDate(LocalDate date) {
-        return ticketRepository.findTopFilmByDate(date);
+        return timed("db.JpaTicketStore.findTopFilmByDate", () -> ticketRepository.findTopFilmByDate(date));
+    }
+
+    private <T> T timed(String operation, SupplierWithException<T> action) {
+        long started = observabilityService.start();
+        try {
+            T result = action.get();
+            observabilityService.stopSuccess(operation, started);
+            return result;
+        } catch (RuntimeException e) {
+            observabilityService.stopFailure(operation, started);
+            throw e;
+        }
+    }
+
+    private void timedVoid(String operation, Runnable action) {
+        timed(operation, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    @FunctionalInterface
+    private interface SupplierWithException<T> {
+        T get();
     }
 }

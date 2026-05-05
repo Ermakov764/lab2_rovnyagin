@@ -8,6 +8,7 @@ import ru.hse.lab8.additional.dto.CrudFilm;
 import ru.hse.lab8.additional.dto.CrudTicket;
 import ru.hse.lab8.additional.dto.FilmStats;
 import ru.hse.lab8.additional.AnalyticsException;
+import ru.hse.lab8.additional.observability.ObservabilityService;
 
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -30,6 +31,7 @@ public class AnalyticsService {
     private static final Comparator<LocalDate> EARLIER_WINS_ON_TIE = Comparator.reverseOrder();
 
     private final CinemaCrudClient crudClient;
+    private final ObservabilityService observabilityService;
 
     /**
      * Строит сводку "фильм -> лучший день по уникальным зрителям".
@@ -40,34 +42,43 @@ public class AnalyticsService {
      * 3) для каждого фильма с билетами считаем max-день в {@link #buildMaxDayStat(Long, String, List)}.
      */
     public List<FilmStats> maxViewersSummary() {
-        // 1) Читаем "сырые" данные из основного CRUD.
-        List<CrudFilm> films = crudClient.fetchFilms();
-        // Группировка нужна, чтобы быстро получить все билеты конкретного фильма по его id.
-        Map<Long, List<CrudTicket>> ticketsByFilmId = crudClient.fetchAllTickets().stream()
-                .filter(t -> t.filmId() != null)
-                .collect(Collectors.groupingBy(CrudTicket::filmId));
+        long started = observabilityService.start();
+        try {
+            // 1) Читаем "сырые" данные из основного CRUD.
+            List<CrudFilm> films = crudClient.fetchFilms();
+            // Группировка нужна, чтобы быстро получить все билеты конкретного фильма по его id.
+            Map<Long, List<CrudTicket>> ticketsByFilmId = crudClient.fetchAllTickets().stream()
+                    .filter(t -> t.filmId() != null)
+                    .collect(Collectors.groupingBy(CrudTicket::filmId));
 
-        // Пустой каталог -> пустая сводка (это не ошибка API).
-        if (films.isEmpty()) {
-            return List.of();
+            // Пустой каталог -> пустая сводка (это не ошибка API).
+            if (films.isEmpty()) {
+                observabilityService.stopSuccess("calc.additional.maxViewersSummary", started);
+                return List.of();
+            }
+
+            // 2) Стабильный порядок ответа: сначала фильмы с валидным id, отсортированные по id.
+            List<CrudFilm> filmsOrderedById = films.stream()
+                    .filter(film -> film.id() != null)
+                    .sorted(Comparator.comparing(CrudFilm::id))
+                    .toList();
+
+            List<FilmStats> result = filmsOrderedById.stream()
+                    // В сводку включаем только фильмы, у которых есть хотя бы один билет.
+                    .filter(film -> ticketsByFilmId.containsKey(film.id()))
+                    .map(film -> {
+                        String filmTitle = film.title() != null ? film.title() : "";
+                        List<CrudTicket> filmTickets = ticketsByFilmId.get(film.id());
+                        // 3) Для каждого фильма считаем "лучший" день по уникальным зрителям.
+                        return buildMaxDayStat(film.id(), filmTitle, filmTickets);
+                    })
+                    .toList();
+            observabilityService.stopSuccess("calc.additional.maxViewersSummary", started);
+            return result;
+        } catch (RuntimeException e) {
+            observabilityService.stopFailure("calc.additional.maxViewersSummary", started);
+            throw e;
         }
-
-        // 2) Стабильный порядок ответа: сначала фильмы с валидным id, отсортированные по id.
-        List<CrudFilm> filmsOrderedById = films.stream()
-                .filter(film -> film.id() != null)
-                .sorted(Comparator.comparing(CrudFilm::id))
-                .toList();
-
-        return filmsOrderedById.stream()
-                // В сводку включаем только фильмы, у которых есть хотя бы один билет.
-                .filter(film -> ticketsByFilmId.containsKey(film.id()))
-                .map(film -> {
-                    String filmTitle = film.title() != null ? film.title() : "";
-                    List<CrudTicket> filmTickets = ticketsByFilmId.get(film.id());
-                    // 3) Для каждого фильма считаем "лучший" день по уникальным зрителям.
-                    return buildMaxDayStat(film.id(), filmTitle, filmTickets);
-                })
-                .toList();
     }
 
     /** День с максимумом уникальных зрителей; при равенстве — более ранняя дата сеанса. */
