@@ -2,18 +2,32 @@
 # Переменные DBHOST / DBPORT / DBNAME / SCHEMANAME — как для app на hl03 с БД на hl12.
 #
 # Пример:
-#   docker compose -f docker-compose.hl12.yml --env-file .env up -d
+#   docker compose -f docker-compose.hl12.yml --env-file .env up -d --build
 #   docker compose -f docker-compose.hl12.yml logs crud-app --tail 80
 #
+# LAB12 (Kafka): контейнер должен резолвить оба broker’а (hl14/hl15). Иначе producer/consumer
+# зависают на metadata. Адреса можно переопределить: HL14_ZIL_IP / HL15_ZIL_IP.
+#
 # MAIN_CRUD_BASE_URL по умолчанию http://crud-app:8080 — имя сервиса внутри этой же compose-сети.
+#
+# Образ CRUD по умолчанию собирается локально (LAB12). Чтобы взять готовый из registry:
+#   DOCKER_IMAGE_APP=lavrentiyermakov/lab2_rovnyagin:latest docker compose -f docker-compose.hl12.yml up -d
+# (и уберите/игнорируйте build — Compose возьмёт указанный image, если не задан build override;
+#  при необходимости удалите секцию build из этого файла или используйте профиль.)
 
 services:
   crud-app:
-    image: ${DOCKER_IMAGE_APP:-lavrentiyermakov/lab2_rovnyagin:latest}
+    image: ${DOCKER_IMAGE_APP:-lab2_rovnyagin:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: lab8_crud_app
     restart: unless-stopped
     ports:
       - "${APP_PUBLISH_PORT:-8080}:8080"
+    extra_hosts:
+      - "hl14.zil:${HL14_ZIL_IP:-10.60.3.12}"
+      - "hl15.zil:${HL15_ZIL_IP:-10.60.3.13}"
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://${DBHOST:-hl12.zil}:${DBPORT:-5432}/${DBNAME:-lab2_db}?currentSchema=${SCHEMANAME:-public}
@@ -27,7 +41,7 @@ services:
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:-false}
       ADDITIONAL_SERVICE_BASE_URL: ${ADDITIONAL_SERVICE_BASE_URL:-http://additional-app:8081}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-hl15.zil:9094}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-hl14.zil:9094,hl15.zil:9094}
       KAFKA_TOPIC: ${KAFKA_TOPIC:-hl03}
       KAFKA_LISTENER_CONCURRENCY: ${KAFKA_LISTENER_CONCURRENCY:-2}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms256m -Xmx1152m}
