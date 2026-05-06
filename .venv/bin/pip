@@ -1,4 +1,4 @@
-#!/home/serafim/Desktop/Labs_Rovnyagin/lab2_rovnyagin/.venv/bin/python3
+#!/home/hl/lab2_rovnyagin/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

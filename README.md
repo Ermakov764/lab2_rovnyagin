@@ -1,402 +1,215 @@
-# Лабораторные работы №9-10
+# Лабораторные работы №11-12
 
-Проект состоит из двух Spring Boot сервисов:
+Проект — два Spring Boot сервиса:
 
-- `crud-app` на порту `8080` - основной CRUD-сервис с фильмами, зрителями и билетами.
-- `additional-app` на порту `8081` - дополнительный сервис аналитики.
+- **`crud-app`** (порт `8080`) — основной CRUD; в **лаб. 12** подписан на Kafka и выполняет JSON-команды из топика варианта.
+- **`additional-app`** (порт `8081`) — аналитика (для полного стенда в compose).
 
-Текущий README описывает только актуальные лабораторные:
+Этот README описывает только **лаб. 11** и **лаб. 12**:
 
-- **Лаб. 9** - наблюдаемость, сбор статистики и k6-прогоны при CPU `0.5` и `1.0`.
-- **Лаб. 10** - кеширование справочника фильмов в `additional-service`.
+- **Лаб. 11** — инфраструктура Kafka курса: узлы **hl14** / **hl15**, Docker Swarm, **топик варианта**, таблица ресурсов, **Kafka UI** и при необходимости **доступ с ПК через SSH-туннели** (см. методичку, § про туннелирование).
+- **Лаб. 12** — **интеграция приложения** с Kafka: consumer в `crud-app`, `docker-compose`, скрипт отправки сообщений, проверка по логам и REST.
 
 ## Архитектура
 
-Основной пользовательский сценарий для нагрузки:
+Стенд приложения (после `docker compose`):
 
 ```text
-k6
-  -> GET /api/cinema/films/max-viewers-summary на crud-app:8080
-      -> crud-app проксирует запрос в additional-app:8081
-          -> additional-app строит статистику по данным CRUD
+crud-app:8080  <->  БД
+additional-app:8081  ->  запросы к crud-app для аналитики
 ```
 
-`additional-service` строит отчет:
+Цепочка **лаб. 12** (команда из Kafka попадает в БД):
 
 ```text
-GET /api/analytics/films/max-viewers-summary
+scripts/send_kafka_message.py (или другой producer)
+  -> Kafka: hl14.zil:9094, hl15.zil:9094 — топик варианта
+      -> crud-app: @KafkaListener
+          -> обработчики FILM / VIEWER / TICKET -> сервисы -> БД
 ```
-
-Для расчета он использует:
-
-- `GET /api/films` - справочник фильмов;
-- `GET /api/tickets` - билеты, по которым считается статистика посещаемости.
 
 ## Важные файлы
 
 | Файл | Назначение |
 |------|------------|
-| `docker-compose.hl12.yml` | запуск `crud-app` и `additional-app` с БД на hl12 |
-| `.env` | адрес БД, Docker-образы, порты, CPU/RAM лимиты |
-| `scripts/lab9-hl3.sh` | helper на hl03: build, restart, смена CPU, сбор docker logs |
-| `scripts/lab9-hl11-run-all.sh` | полный k6-прогон на hl11: CPU `0.5` и `1.0`, смеси `5/95`, `50/50`, `95/5` |
-| `k6/run-ratio-sweep.sh` | три k6-прогона для одного CPU |
-| `k6/plot-from-results.sh` | построение PNG-графиков из `results/cpu-*` |
-| `k6/collect-observability-after-k6.sh` | сохранение `/api/observability` после k6-прогона |
-| `additional-service/src/main/java/ru/hse/lab8/additional/service/FilmCacheService.java` | кеш фильмов для лаб. 10 |
-| `additional-service/src/main/java/ru/hse/lab8/additional/service/AnalyticsService.java` | расчет общей статистики |
+| `docker-compose.hl12.yml` | `crud-app` + `additional-app`; `extra_hosts` для **`hl14.zil` / `hl15.zil`**; переменные **`KAFKA_*`** |
+| `.env` | БД, образы, лимиты CPU/RAM; при необходимости `HL14_ZIL_IP`, `HL15_ZIL_IP`, `KAFKA_TOPIC` |
+| `scripts/send_kafka_message.py` | отправка JSON-команды в топик (Python, `kafka-python`) |
+| `src/main/java/ru/hse/lab2/kafka/*` | consumer, разбор команд, обработчики (лаб. 12) |
+| `src/main/resources/application.properties` | `spring.kafka.*`, `lab.kafka.topic` |
+| `scripts/lab9-hl3.sh` | вспомогательно: **сборка и подъём стенда** на персональной ВМ (`prepare`) |
 
-## Лабораторная 9
+Методички курса (лаб. 11): разбор Swarm и команд — в [заметке про Kafka + Swarm](https://zil.digital/blog/kafka-kraft-swarm-debian12) и в `kafka-2026.md` репозитория [hl-module2](https://bitbucket.org/zil-courses/hl-module2/src/main/kafka/kafka-2026.md).
 
-### Что реализовано
+## Лабораторная 11 — Kafka на стенде курса
 
-В обоих сервисах есть observability-слой:
+### Цель
 
-- `src/main/java/ru/hse/lab2/observability/*` - основной CRUD-сервис;
-- `additional-service/src/main/java/ru/hse/lab8/additional/observability/*` - additional-service.
+Познакомиться с **кластером Kafka** курса (брокеры в **Docker Swarm**), создать **топик по номеру варианта**, занести его в [таблицу ресурсов](https://docs.google.com/spreadsheets/d/1CoubOXgx3PPpACLwhk_1lJ7QfoCFjmLf9jEzhSnu0qM/edit), открыть **Kafka UI** с ПК и при необходимости отправлять сообщения **с локальной машины** через туннель (раздел про SSH в `kafka-2026.md`).
 
-Он собирает статистику операций по временным окнам:
+### Что такое hl14 и hl15
 
-- количество запросов;
-- количество ошибок;
-- среднее время;
-- `min`, `max`;
-- `p50`, `p95`, `p99`;
-- `rps`.
+| Имя | Роль |
+|-----|------|
+| **hl14** | Узел с брокером Kafka (и связанным стеком) в инфраструктуре курса. В DNS стенда: **`hl14.zil`**. |
+| **hl15** | Второй узел с брокером; **`hl15.zil`**. |
 
-Статистика доступна через:
+Это **не** персональная ВМ под твой проект (условно hl03), а **общие машины кластера**. Клиенты указывают **оба** bootstrap-адреса (`hl14.zil:…`, `hl15.zil:…`), чтобы корректно получать метаданные и работать при отказе одного брокера.
 
-```text
-GET /api/observability
-GET /api/observability?window=10s
-GET /api/observability/windows
-```
+Числа **2314** / **2315** в таблице ресурсов — это **SSH-порты на `hlssh.zil.digital`** для входа на соответствующие хосты (как в задании: «залогиниться на hl14 / hl15»). **Свой** персональный порт (например **2303**) используется для **своей** ВМ, где крутится docker-compose с приложением.
 
-Окна и период обновления задаются в `application.properties`:
+### Папка варианта на персональной ВМ
 
-```properties
-observability.windows=${OBSERVABILITY_WINDOWS:10s,30s,1m}
-observability.tick-ms=${OBSERVABILITY_TICK_MS:1000}
-observability.log-on-refresh=${OBSERVABILITY_LOG_ON_REFRESH:true}
-observability.log-empty-snapshots=${OBSERVABILITY_LOG_EMPTY_SNAPSHOTS:false}
-```
-
-### Запуск стенда на hl03
-
-Из корня проекта на hl03:
+На своей ВМ (после `ssh` с **твоим** портом из таблицы):
 
 ```bash
-cd ~/lab2_rovnyagin
-bash scripts/lab9-hl3.sh prepare
+mkdir -p /home/hl/<вариант>
+cd /home/hl/<вариант>
 ```
 
-Скрипт:
+Подставь каталог как в задании (например `hl3` или `hl03` — как в столбце варианта/БД).
 
-1. собирает Docker-образ основного сервиса;
-2. собирает Docker-образ `additional-service`;
-3. запускает compose;
-4. проверяет доступность сервисов.
+### Топик
 
-Проверка вручную:
+Имя топика = **номер варианта из таблицы** (должно совпадать с тем, что потом читает приложение: `KAFKA_TOPIC` / `lab.kafka.topic`). После создания топика **заполни столбец Kafka Topic** в Google-таблице.
+
+### Docker Swarm, сервисы и логи
+
+На **hl14** / **hl15** (см. методичку и SSH-порты **2314** / **2315**): команды вида `docker service ls`, `docker service logs …`, просмотр stack — по инструкциям из ссылок выше.
+
+### Kafka UI с локального ПК
+
+Подними **отдельный терминал на ПК** с пробросом порта UI. Если на ПК **8080** уже занят (например, веб-слой Cinema на `localhost:8080`), пробрось UI на **другой локальный порт**:
 
 ```bash
-curl -s http://127.0.0.1:8080/api/cinema/ping
-curl -s http://127.0.0.1:8080/api/observability >/dev/null && echo "main observability ok"
-curl -s http://127.0.0.1:8081/api/observability >/dev/null && echo "additional observability ok"
+ssh -p 2315 -L 18080:127.0.0.1:8080 hl@hlssh.zil.digital
 ```
 
-### CPU 0.5 и 1.0
+В браузере: **`http://127.0.0.1:18080`**. Конкретный **SSH-порт** (`2314` или `2315`) и пользователь смотри в **таблице ресурсов** и в `kafka-2026.md`.
 
-CPU меняется на hl03 так:
+### Доступ к брокеру с ПК (туннель)
 
-```bash
-cd ~/lab2_rovnyagin
-bash scripts/lab9-hl3.sh set-cpu 0.5
-bash scripts/lab9-hl3.sh set-cpu 1.0
-```
+Если в методичке нужно писать в Kafka **с локальной машины**, подними туннель на порт **bootstrap** брокера (в нашем проекте для приложения используется **9094** на `hl14`/`hl15`) — точная схема и порты в **§ про SSH-туннелирование** в `kafka-2026.md`. После туннеля в клиенте указывается `127.0.0.1:<локальный_порт>`.
 
-Команда меняет в `.env`:
+---
 
-```text
-APP_CPU_LIMIT
-ADDITIONAL_CPU_LIMIT
-```
-
-и пересоздает контейнеры через:
-
-```bash
-docker compose -f docker-compose.hl12.yml --env-file .env up -d --force-recreate
-```
-
-### Полный автоматический k6-прогон на hl11
-
-На k6-ВМ `hl11`:
-
-```bash
-export K6_ROOT="$HOME/ermakov_k6"
-export MAIN_BASE_URL="http://10.60.3.33:8080"
-export ADDITIONAL_BASE_URL="http://10.60.3.33:8081"
-export HL03_SSH_HOST="hl@10.60.3.33"
-export HL03_REPO_DIR="~/lab2_rovnyagin"
-
-bash "$K6_ROOT/lab9-hl11-run-all.sh"
-```
-
-По умолчанию используются:
-
-```text
-TARGET_VUS=30
-DURATION=90s
-K6_ROUTE=server-to-server
-```
-
-Скрипт снимает 6 прогонов:
-
-| CPU | POST/GET смесь |
-|-----|----------------|
-| `0.5` | `5/95` |
-| `0.5` | `50/50` |
-| `0.5` | `95/5` |
-| `1.0` | `5/95` |
-| `1.0` | `50/50` |
-| `1.0` | `95/5` |
-
-После каждого прогона сохраняются:
-
-- k6 summary JSON;
-- observability JSON/TXT по `crud-app`;
-- observability JSON/TXT по `additional-app`;
-- docker logs обоих контейнеров.
-
-### Результаты k6
-
-После полного прогона должны появиться:
-
-```text
-~/ermakov_k6/results/cpu-0.5/
-~/ermakov_k6/results/cpu-1.0/
-~/ermakov_k6/logs/
-```
-
-Проверка:
-
-```bash
-ls ~/ermakov_k6/results/cpu-0.5
-ls ~/ermakov_k6/results/cpu-1.0
-ls ~/ermakov_k6/logs
-```
-
-В каждой CPU-папке должны быть summary-файлы:
-
-```text
-summary-post05-get95-vus-30-cpu-0.5.json
-summary-post50-get50-vus-30-cpu-0.5.json
-summary-post95-get05-vus-30-cpu-0.5.json
-```
-
-и аналогичные для `cpu-1.0`.
-
-### Построение графиков
-
-На hl11:
-
-```bash
-cd ~/ermakov_k6
-TARGET_VUS=30 bash k6/plot-from-results.sh
-```
-
-PNG появятся в:
-
-```text
-~/ermakov_k6/k6/png_k6/
-```
-
-Ожидаемые файлы:
-
-```text
-vs-cpu-mix-5-95.png
-vs-cpu-mix-50-50.png
-vs-cpu-mix-95-5.png
-```
-
-## Лабораторная 10
+## Лабораторная 12 — приложение и команды в Kafka
 
 ### Задача
 
-Нужно добавить класс, который кеширует записи, необходимые для вывода общей статистики в `additional-service`, и периодически печатает статистику наполнения кеша.
+`crud-app` **читает** из топика варианта JSON-сообщения (`entity`, `operation`, `payload`) и выполняет операции над фильмами, зрителями и билетами.
 
-В этом проекте кешируется **справочник фильмов**:
+### Связка с hl14 / hl15 в Docker
 
-```text
-filmId -> CrudFilm(id, title)
-```
+Контейнер `crud-app` должен **резолвить** `hl14.zil` и `hl15.zil` (см. комментарий в `docker-compose.hl12.yml`). В compose заданы `extra_hosts` с IP из сети курса (по умолчанию `10.60.3.12` и `10.60.3.13`). Если адреса другие — задай `HL14_ZIL_IP` и `HL15_ZIL_IP` в `.env`.
 
-Почему именно фильмы:
+Bootstrap в проекте: **`hl14.zil:9094`**, **`hl15.zil:9094`** (`KAFKA_BOOTSTRAP_SERVERS`).
 
-- `additional-service` использует фильмы для вывода `filmTitle` в итоговой статистике;
-- справочник фильмов меняется реже, чем билеты;
-- повторные запросы аналитики часто используют один и тот же список фильмов;
-- билеты не кешируются, чтобы расчет посещаемости оставался актуальным.
+### Топик
 
-### Где реализовано
+Как в таблице ресурсов; в репозитории по умолчанию задано **`hl03`**. Переопределение: `KAFKA_TOPIC` в environment или флаг `--topic` у скрипта.
 
-| Файл | Что делает |
-|------|------------|
-| `FilmCacheService.java` | хранит `HashMap<Long, CrudFilm>`, проверяет TTL, обновляется из CRUD |
-| `AnalyticsService.java` | берет фильмы через `filmCacheService.getFilms()` |
-| `application.properties` | содержит TTL и период логирования кеша |
+### Код и настройки
 
-Главное изменение в `AnalyticsService`:
+- `src/main/java/ru/hse/lab2/kafka/*`
+- `Lab2Application` — `@EnableKafka`
+- `application.properties` — `spring.kafka.bootstrap-servers`, `lab.kafka.topic`
 
-```java
-List<CrudFilm> films = filmCacheService.getFilms();
-```
-
-Теперь `AnalyticsService` не ходит за фильмами напрямую в CRUD. Он обращается к сервису кеша, а `FilmCacheService` сам решает:
-
-- если кеш свежий - вернуть фильмы из памяти;
-- если кеш пустой или устарел - вызвать `crudClient.fetchFilms()` и обновить `HashMap`.
-
-### Логика TTL-кеша
-
-У кеша есть три важных поля:
-
-```java
-private final Map<Long, CrudFilm> filmsById = new HashMap<>();
-private final long ttlMs;
-private long lastRefreshAtMs;
-```
-
-Логика:
-
-```text
-getFilms()
-  |
-  |-- кеш свежий?
-  |      |
-  |      |-- да -> hits++ -> вернуть List.copyOf(filmsById.values())
-  |
-  |-- нет -> misses++ -> crudClient.fetchFilms() -> обновить HashMap -> refreshes++ -> вернуть снимок
-```
-
-Первый запрос после старта всегда приводит к refresh, потому что `lastRefreshAtMs == 0`.
-
-Если TTL равен 30 секундам:
-
-- запрос через 5 секунд берет фильмы из кеша;
-- запрос через 30 секунд или позже обновляет кеш из CRUD.
-
-### Настройки кеша
-
-В `additional-service/src/main/resources/application.properties`:
-
-```properties
-film-cache.ttl-ms=${FILM_CACHE_TTL_MS:30000}
-film-cache.stats-rate-ms=${FILM_CACHE_STATS_RATE_MS:10000}
-```
-
-Значения по умолчанию:
-
-- `FILM_CACHE_TTL_MS=30000` - кеш фильмов живет 30 секунд;
-- `FILM_CACHE_STATS_RATE_MS=10000` - статистика кеша печатается каждые 10 секунд.
-
-### Логи кеша
-
-`FilmCacheService` печатает строку:
-
-```text
-film-cache stats: size=300 ttlMs=30000 lastRefreshAtMs=... hits=295010 misses=54 refreshes=54
-```
-
-Расшифровка:
-
-- `size` - сколько фильмов лежит в кеше;
-- `ttlMs` - TTL кеша;
-- `hits` - сколько раз фильмы были взяты из кеша;
-- `misses` - сколько раз кеш был пустой или устаревший;
-- `refreshes` - сколько раз кеш реально обновлялся из CRUD.
-
-Проверка логов после k6:
-
-```bash
-grep "film-cache stats" ~/ermakov_k6/logs/additional-*.log | tail -30
-```
-
-Пример результата из прогона:
-
-```text
-film-cache stats: size=300 ttlMs=30000 ... hits=295010 misses=54 refreshes=54
-```
-
-Это показывает, что большая часть обращений к справочнику фильмов обслуживается из памяти, а не через повторный `GET /api/films`.
-
-### Docker после изменений в коде
-
-После изменения Java-кода нужно пересобрать образ и пересоздать контейнер:
+### Зависимость для скрипта
 
 ```bash
 cd ~/lab2_rovnyagin
-docker build -f Dockerfile.additional-service -t lavrentiyermakov/lab2_additional:lab8-20260503 .
-docker compose -f docker-compose.hl12.yml --env-file .env up -d --force-recreate additional-app
+source .venv/bin/activate
+python3 -m pip install kafka-python
 ```
 
-Или полный вариант:
+### Шпаргалка для сдачи (на ВМ со стендом)
+
+Контейнер должен видеть `hl14.zil` / `hl15.zil`.
+
+**Шаг A — отправить команду в Kafka**
+
+```bash
+cd ~/lab2_rovnyagin
+source .venv/bin/activate
+```
+
+```bash
+TITLE="BUUUBUU$(date +%s)"
+echo "$TITLE"
+```
+
+```bash
+python scripts/send_kafka_message.py \
+  --bootstrap-server hl14.zil:9094,hl15.zil:9094 \
+  --entity FILM \
+  --operation POST \
+  --payload "{\"title\":\"$TITLE\",\"genre\":\"Demo\",\"durationMinutes\":120}"
+```
+
+При необходимости: `--topic <твой_топик>`.
+
+**Шаг B — логи приложения**
+
+```bash
+docker logs lab8_crud_app 2>&1 | grep "Processed Kafka command" | tail -n 5
+```
+
+**Шаг C — результат в REST / БД**
+
+```bash
+curl -sS http://127.0.0.1:8080/api/films | python3 -m json.tool | grep -F "$TITLE"
+```
+
+### Подъём стенда
 
 ```bash
 cd ~/lab2_rovnyagin
 bash scripts/lab9-hl3.sh prepare
 ```
 
-Проверка:
+или вручную: `docker compose -f docker-compose.hl12.yml --env-file .env up -d --build`.
 
-```bash
-docker logs lab8_additional_app --tail 80 | grep "film-cache stats"
-```
+## Что приложить в отчёт
 
-## Что приложить в отчет
+**Лаб. 11**
 
-Для лабораторной 9:
+- что такое **hl14/hl15**, как заходил по SSH (порты из таблицы);
+- кратко: просмотр Swarm/логов (по методичке);
+- папка `/home/hl/<вариант>`;
+- имя **топика** и строка в **Google Sheets**;
+- скрин или описание **Kafka UI** (в т.ч. туннель, если **8080** занят — другой локальный порт).
 
-- 3 PNG-графика `vs-cpu-mix-*.png`;
-- summary JSON из `results/cpu-0.5` и `results/cpu-1.0`;
-- observability TXT/JSON по обоим сервисам.
+**Лаб. 12**
 
-Для лабораторной 10:
-
-- описание `FilmCacheService`;
-- настройки TTL;
-- фрагмент логов `film-cache stats`;
-- те же графики CPU `0.5` и `1.0`, снятые после включения кеша.
+- `extra_hosts`, bootstrap **9094**, имя топика;
+- вывод шага B и шага C (фильм с `$TITLE` в `GET /api/films`).
 
 ## Быстрый чеклист
 
-На hl03:
+Поднять приложение на персональной ВМ:
 
 ```bash
 cd ~/lab2_rovnyagin
 bash scripts/lab9-hl3.sh prepare
 ```
 
-На hl11:
+Лаб. 11: туннель Kafka UI (пример):
 
 ```bash
-export K6_ROOT="$HOME/ermakov_k6"
-export MAIN_BASE_URL="http://10.60.3.33:8080"
-export ADDITIONAL_BASE_URL="http://10.60.3.33:8081"
-export HL03_SSH_HOST="hl@10.60.3.33"
-export HL03_REPO_DIR="~/lab2_rovnyagin"
-bash "$K6_ROOT/lab9-hl11-run-all.sh"
+ssh -p 2315 -L 18080:127.0.0.1:8080 hl@hlssh.zil.digital
 ```
 
-Построить графики:
+Лаб. 12 — смок-тест Kafka:
 
 ```bash
-cd ~/ermakov_k6
-TARGET_VUS=30 bash k6/plot-from-results.sh
-```
-
-Проверить кеш:
-
-```bash
-grep "film-cache stats" ~/ermakov_k6/logs/additional-*.log | tail -30
+cd ~/lab2_rovnyagin
+source .venv/bin/activate
+TITLE="BUUUBUU$(date +%s)"
+python scripts/send_kafka_message.py \
+  --bootstrap-server hl14.zil:9094,hl15.zil:9094 \
+  --entity FILM --operation POST \
+  --payload "{\"title\":\"$TITLE\",\"genre\":\"Demo\",\"durationMinutes\":120}"
+docker logs lab8_crud_app 2>&1 | grep "Processed Kafka command" | tail -n 5
+curl -sS http://127.0.0.1:8080/api/films | python3 -m json.tool | grep -F "$TITLE"
 ```
