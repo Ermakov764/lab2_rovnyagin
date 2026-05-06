@@ -8,9 +8,9 @@ import org.springframework.stereotype.Service;
 import ru.hse.lab8.additional.client.CinemaCrudClient;
 import ru.hse.lab8.additional.dto.CrudFilm;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Кеш справочника фильмов в памяти Additional service.
@@ -27,7 +27,8 @@ public class FilmCacheService {
     // Срок жизни кеша: после истечения TTL следующий запрос обновит фильмы из CRUD.
     private final long ttlMs;
     // Основное хранилище кеша: filmId -> снимок фильма из CRUD.
-    private final Map<Long, CrudFilm> filmsById = new HashMap<>();
+    // ConcurrentHashMap безопаснее обычного HashMap при параллельных HTTP-запросах к Additional.
+    private final Map<Long, CrudFilm> filmsById = new ConcurrentHashMap<>();
 
     // Время последнего успешного refresh, нужно для проверки TTL.
     private long lastRefreshAtMs;
@@ -47,7 +48,7 @@ public class FilmCacheService {
     }
 
     public synchronized List<CrudFilm> getFilms() {
-        // Метод synchronized, чтобы несколько одновременных запросов не обновляли HashMap параллельно.
+        // synchronized оставлен для атомарной проверки TTL и refresh, чтобы несколько потоков не обновляли кеш одновременно.
         long nowMs = System.currentTimeMillis();
         // Если TTL еще не истек, считаем обращение успешным попаданием в кеш.
         if (!isExpired(nowMs)) {
@@ -121,7 +122,7 @@ public class FilmCacheService {
     }
 
     private List<CrudFilm> snapshot() {
-        // Возвращаем копию, чтобы внешний код не мог изменить внутренний HashMap.
+        // Возвращаем копию, чтобы внешний код не мог изменить внутренний ConcurrentHashMap.
         return List.copyOf(filmsById.values());
     }
 }
