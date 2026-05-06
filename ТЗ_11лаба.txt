@@ -1,0 +1,12 @@
+LAB11
+
+Залогиниться на hl14.zil (2314)/hl15.zil (2315), ознакомиться с логами и сервисами Kafka в DockerSwarm при помощи команд из https://zil.digital/blog/kafka-kraft-swarm-debian12 
+https://bitbucket.org/zil-courses/hl-module2/src/main/kafka/kafka-2026.md?at=main 
+С локальной машины подключиться к hl15.zil 
+Создать папку в /home/hl/по номеру своего варианта (например /home/hl/hl05)
+Создать топик по номеру своего варианта и внести его в столбец 
+https://docs.google.com/spreadsheets/d/1CoubOXgx3PPpACLwhk_1lJ7QfoCFjmLf9jEzhSnu0qM/edit?pli=1&gid=0#gid=0 
+Проверить работу kafka UI при помощи тунелирования по ssh: 
+ssh -p 2315 -L 8080:127.0.0.1:8080 hl@hlssh.zil.digital
+
+Подключиться локально со своей машины и записать дополнительные сообщения в топик (раздел 8. SSH‑туннелирование для удалённой работы с Kafka

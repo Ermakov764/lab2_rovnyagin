@@ -29,3 +29,4 @@ png_k6/
 k6_lab6_results_pull/
 # Скопированные с ВМ results/cpu-* (лаб. 6)
 results/
+docs/hosts-ports.md
