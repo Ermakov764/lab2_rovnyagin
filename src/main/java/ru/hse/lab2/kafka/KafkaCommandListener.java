@@ -1,5 +1,7 @@
 package ru.hse.lab2.kafka;
 
+import java.util.List;
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,35 +19,41 @@ public class KafkaCommandListener {
         this.dispatcher = dispatcher;
     }
 
+    /**
+     * LAB13: batch listener — одна запись на команду; разбор как раньше на каждое сообщение в пачке.
+     */
     @KafkaListener(
             id = "lab2KafkaCommandListener",
             topics = "${lab.kafka.topic}",
             groupId = "${spring.kafka.consumer.group-id}",
-            concurrency = "${lab.kafka.listener-concurrency}"
+            concurrency = "${lab.kafka.listener-concurrency}",
+            containerFactory = "kafkaBatchListenerContainerFactory"
     )
-    public void listen(ConsumerRecord<String, String> record) {
-        log.info(
-                "Received Kafka command from topic={}, partition={}, offset={}",
-                record.topic(),
-                record.partition(),
-                record.offset()
-        );
-        try {
-            dispatcher.dispatch(record.value());
+    public void listen(List<ConsumerRecord<String, String>> records) {
+        for (ConsumerRecord<String, String> record : records) {
             log.info(
-                    "Processed Kafka command from topic={}, partition={}, offset={}",
+                    "Received Kafka command from topic={}, partition={}, offset={}",
                     record.topic(),
                     record.partition(),
                     record.offset()
             );
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Skipped Kafka command from topic={}, partition={}, offset={}: {}",
-                    record.topic(),
-                    record.partition(),
-                    record.offset(),
-                    e.getMessage()
-            );
+            try {
+                dispatcher.dispatch(record.value());
+                log.info(
+                        "Processed Kafka command from topic={}, partition={}, offset={}",
+                        record.topic(),
+                        record.partition(),
+                        record.offset()
+                );
+            } catch (RuntimeException e) {
+                log.warn(
+                        "Skipped Kafka command from topic={}, partition={}, offset={}: {}",
+                        record.topic(),
+                        record.partition(),
+                        record.offset(),
+                        e.getMessage()
+                );
+            }
         }
     }
 }

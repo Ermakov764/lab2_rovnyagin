@@ -14,6 +14,8 @@
 #   DOCKER_IMAGE_APP=lavrentiyermakov/lab2_rovnyagin:latest docker compose -f docker-compose.hl12.yml up -d
 # (и уберите/игнорируйте build — Compose возьмёт указанный image, если не задан build override;
 #  при необходимости удалите секцию build из этого файла или используйте профиль.)
+#
+# LAB13: прокси k6→Kafka — docker compose -f docker-compose.hl12.yml --profile lab13 up -d --build
 
 services:
   crud-app:
@@ -75,3 +77,19 @@ services:
         reservations:
           cpus: "${ADDITIONAL_CPU_RESERVATION:-0.1}"
           memory: ${ADDITIONAL_MEMORY_RESERVATION:-128M}
+
+  kafka-proxy:
+    profiles: ["lab13"]
+    build:
+      context: ./k6/kafka-proxy
+      dockerfile: Dockerfile
+    container_name: lab13_kafka_proxy
+    restart: unless-stopped
+    ports:
+      - "${KAFKA_PROXY_PUBLISH_PORT:-8082}:8082"
+    extra_hosts:
+      - "hl14.zil:${HL14_ZIL_IP:-10.60.3.12}"
+      - "hl15.zil:${HL15_ZIL_IP:-10.60.3.13}"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-hl14.zil:9094,hl15.zil:9094}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-hl03}

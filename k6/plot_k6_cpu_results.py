@@ -1,26 +1,25 @@
 #!/usr/bin/env python3
 """
-k6 → PNG: три графика по смесям 5/95, 50/50, 95/5 (лаб. 6 п. 10 ТЗ и лаб. 8).
-На каждом: ось X — лимит CPU (подкаталоги results/cpu-*), ось Y — среднее время
+k6 → PNG: три графика по смесям 5/95, 50/50, 95/5 (лаб. 6 п. 10 ТЗ и лаб. 8, лаб. 13).
+На каждом: ось X — лимит CPU (подкаталоги k6/results/cpu-* или results/cpu-*), ось Y — среднее время
 отклика (мс) при постоянных VU; две кривые — POST и GET.
 
-Каждый JSON должен содержать lab6_meta (пишет cinema-lab8-constant.js при запуске
-через run-lab8-ratio-sweep.sh; то же поле использовалась лаб. 6).
+Каждый JSON должен содержать lab6_meta (пишет k6/cinema-constant.js через
+k6/run-ratio-sweep.sh; то же поле использовалась лаб. 6).
 
 Одна серия прогонов: одинаковые TARGET_VUS в именах файлов и одинаковое ядро
-lab6_meta между всеми results/cpu-* и всеми смесиями — иначе ошибка.
+lab6_meta между всеми папками cpu-* (k6/results или results) и всеми смесиями — иначе ошибка.
 
 Структура входа:
   <results>/
     cpu-0.5/
-      lab6-summary-post05-get95-vus-30.json
+      summary-post05-get95-vus-30-cpu-0.5.json
       ...
     cpu-1.0/ ...
 
 Выход (по умолчанию <results>/plots/):
-  lab6-vs-cpu-mix-5-95.png
-  lab6-vs-cpu-mix-50-50.png
-  lab6-vs-cpu-mix-95-5.png
+  <png-prefix>-mix-5-95.png
+  …
 
 Если в одной папке cpu-* лежат и *-vus-30.json и *-vus-400.json — укажите --vus 400
 (иначе будет ошибка «разный TARGET_VUS»).
@@ -77,7 +76,7 @@ def _avg_from_http_name_tag(metrics: dict, name_token: str) -> Optional[float]:
 
 
 def extract_post_get_avg(data: dict) -> tuple[Optional[float], Optional[float]]:
-    """Читает post_ms/get_ms из summary k6; фолбэк — подметрика http_req_duration{name:Lab8Post|Lab8Get}."""
+    """Читает post_ms/get_ms из summary k6; фолбэк — подметрика http_req_duration{name:…}."""
     m = data.get("metrics") or {}
     p = (
         extract_avg_from_trend(m.get(METRIC_POST) or {})
@@ -88,9 +87,9 @@ def extract_post_get_avg(data: dict) -> tuple[Optional[float], Optional[float]]:
         or extract_avg_from_trend(m.get(METRIC_GET_LEGACY) or {})
     )
     if g is None:
-        g = _avg_from_http_name_tag(m, "name:Lab8Get")
+        g = _avg_from_http_name_tag(m, "name:Lab8Get") or _avg_from_http_name_tag(m, "name:Get")
     if p is None:
-        p = _avg_from_http_name_tag(m, "name:Lab8Post")
+        p = _avg_from_http_name_tag(m, "name:Lab8Post") or _avg_from_http_name_tag(m, "name:Post")
     return p, g
 
 
@@ -110,7 +109,7 @@ def find_mix_json(
     folder: Path,
     mix_pat: re.Pattern,
     vus_filter: Optional[int] = None,
-    summary_prefix: str = "lab6-summary",
+    summary_prefix: str = "summary",
 ) -> Optional[Path]:
     paths = sorted(
         p
@@ -143,7 +142,7 @@ def missing_mix_issue(
     folder: Path,
     mix_pat: re.Pattern,
     vus_filter: Optional[int],
-    summary_prefix: str = "lab6-summary",
+    summary_prefix: str = "summary",
 ) -> str:
     candidates = [
         p
@@ -231,7 +230,7 @@ def collect_series_for_mix(
     base: Path,
     mix_pat: re.Pattern,
     vus_filter: Optional[int] = None,
-    summary_prefix: str = "lab6-summary",
+    summary_prefix: str = "summary",
 ) -> Tuple[List[Tuple[float, float, float]], int, dict, List[str]]:
     rows: List[Tuple[float, float, float, int, dict]] = []
     issues: List[str] = []
@@ -266,7 +265,7 @@ def collect_series_for_mix(
 
         if p is None or g is None:
             issues.append(
-                f"{path.name}: нет post_ms и get_ms (и нет http_req_duration с name:Lab8Post/Lab8Get); "
+                f"{path.name}: нет post_ms и get_ms (и нет http_req_duration Post/Get); "
                 f"post={p} get={g}. Синхронизируйте k6/cinema-constant.js и переснимите sweep "
                 f"(старые JSON без get_ms строить нельзя — будет искажение)."
             )
@@ -351,16 +350,36 @@ def plot_mix(
     print(f"OK: {path}")
 
 
+def resolve_results_base(cli_path: Optional[Path]) -> Path:
+    """Каталог с cpu-0.5 / cpu-1.0: из CLI или авто (k6/results, results в cwd и у корня репо)."""
+    if cli_path is not None:
+        return cli_path.resolve()
+    cwd = Path.cwd()
+    repo_root = Path(__file__).resolve().parent.parent
+    for candidate in (cwd / "k6/results", cwd / "results", repo_root / "k6/results", repo_root / "results"):
+        if not candidate.is_dir():
+            continue
+        try:
+            if any(
+                d.is_dir() and d.name.lower().startswith("cpu-")
+                for d in candidate.iterdir()
+            ):
+                return candidate.resolve()
+        except OSError:
+            continue
+    return (cwd / "results").resolve()
+
+
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="k6 (лаб. 6/8): 3 PNG — время отклика vs лимит CPU для смесей 5/95, 50/50, 95/5"
+        description="k6 (лаб. 6/8/13): 3 PNG — время отклика vs лимит CPU для смесей 5/95, 50/50, 95/5"
     )
     p.add_argument(
         "results",
         type=Path,
         nargs="?",
-        default=Path("results"),
-        help="Каталог с подкаталогами cpu-0.5, cpu-1.0, …",
+        default=None,
+        help="Каталог с подкаталогами cpu-0.5, cpu-1.0 (если не указан — ищем k6/results или results)",
     )
     p.add_argument(
         "-o",
@@ -378,9 +397,9 @@ def main() -> None:
     )
     p.add_argument(
         "--summary-prefix",
-        default="lab6-summary",
+        default="summary",
         metavar="PREFIX",
-        help="Префикс имён JSON (например summary)",
+        help="Префикс имён JSON (run-ratio-sweep: summary; старые прогоны: lab6-summary)",
     )
     p.add_argument(
         "--title-tag",
@@ -407,7 +426,7 @@ def main() -> None:
         help="Подпись легенды для GET-ветки",
     )
     args = p.parse_args()
-    base = args.results.resolve()
+    base = resolve_results_base(args.results)
     if not base.is_dir():
         die(f"Нет каталога: {base}")
 
@@ -446,7 +465,7 @@ def main() -> None:
     if all_issues:
         for msg in all_issues:
             print(f"Ошибка: {msg}", file=sys.stderr)
-        die("Исправьте results/cpu-* или переснимите прогоны.")
+        die("Исправьте каталог с cpu-* или переснимите прогоны.")
 
     for series, meta, file_slug, mix_label in to_plot:
         plot_mix(

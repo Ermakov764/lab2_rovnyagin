@@ -1,0 +1,28 @@
+# Только LAB13 REST→Kafka прокси (отдельно от crud/additional).
+# Удобно на ВМ с k6: не тянуть весь docker-compose.hl12.yml.
+#
+# Из каталога k6/kafka-proxy:
+#   docker compose up -d --build
+# Из корня репозитория:
+#   docker compose -f k6/kafka-proxy/docker-compose.yml up -d --build
+#
+# k6 на том же хосте:
+#   BASE_URL_KAFKA_PROXY=http://127.0.0.1:8082
+#
+# Подставьте HL14_ZIL_IP / HL15_ZIL_IP под свой стенд или через .env рядом с этим файлом.
+
+services:
+  kafka-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lab13_kafka_proxy
+    restart: unless-stopped
+    ports:
+      - "${KAFKA_PROXY_PUBLISH_PORT:-8082}:8082"
+    extra_hosts:
+      - "hl14.zil:${HL14_ZIL_IP:-10.60.3.12}"
+      - "hl15.zil:${HL15_ZIL_IP:-10.60.3.13}"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-hl14.zil:9094,hl15.zil:9094}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-hl03}

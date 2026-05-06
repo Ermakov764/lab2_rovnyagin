@@ -1,0 +1,5 @@
+LAB13
+Провести нагрузочное тестирование стенда LAB12
+Изменить нагрузочный профиль K6 так, чтобы операции записи происходили не в основное приложение, а в Kafka.
+Для этого можно использовать либо экстеншн (https://github.com/mostafa/xk6-kafka), либо написать прокси-приложение, которое пишет в kafka и стартует рядом с k6 (тогда k6 будет вызывать по REST это приложение, а приложение публиковать сообщения в Kafka).
+Снять графики зависимости для  CPU 0.5 и 1.0 (выставлять одинаково для основного приложения и additional) для разных значений  @KafkaListener(concurrency) - 1 и 2 (топик должен иметь 2 партиции). Использовать Batch Kafka Listener https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/listener-annotation.html#batch-listeners 

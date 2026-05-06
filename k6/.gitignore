@@ -1,6 +1,12 @@
 __pycache__/
 *.pyc
 
+# Логи с hl03 (scp в k6/logs из k6/lab9-hl11-run-all.sh)
+logs/*.log
+
+# LAB13: отдельные прогоны (K6_RESULTS_SUFFIX) — артефакты не коммитить
+results-*/
+
 # LAB6: summary JSON (zil-стиль имён); папки держим в git через .gitkeep
 reports-lab6-pc/*.json
 reports-lab6-s2s/*.json

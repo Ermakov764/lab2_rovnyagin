@@ -1,14 +1,15 @@
-# Лабораторные работы №11-12
+# Лабораторные работы №11–13
 
 Проект — два Spring Boot сервиса:
 
-- **`crud-app`** (порт `8080`) — основной CRUD; в **лаб. 12** подписан на Kafka и выполняет JSON-команды из топика варианта.
+- **`crud-app`** (порт `8080`) — основной CRUD; в **лаб. 12** подписан на Kafka и выполняет JSON-команды из топика варианта; в **лаб. 13** consumer переведён на **batch** `@KafkaListener`.
 - **`additional-app`** (порт `8081`) — аналитика (для полного стенда в compose).
 
-Этот README описывает только **лаб. 11** и **лаб. 12**:
+Этот README описывает **лаб. 11**, **лаб. 12** и **лаб. 13**:
 
 - **Лаб. 11** — инфраструктура Kafka курса: узлы **hl14** / **hl15**, Docker Swarm, **топик варианта**, таблица ресурсов, **Kafka UI** и при необходимости **доступ с ПК через SSH-туннели** (см. методичку, § про туннелирование).
 - **Лаб. 12** — **интеграция приложения** с Kafka: consumer в `crud-app`, `docker-compose`, скрипт отправки сообщений, проверка по логам и REST.
+- **Лаб. 13** — нагрузочное тестирование: запись через **kafka-proxy** + k6, **batch** listener, матрица CPU и `concurrency` (см. раздел ниже).
 
 ## Архитектура
 
@@ -32,7 +33,8 @@ scripts/send_kafka_message.py (или другой producer)
 
 | Файл | Назначение |
 |------|------------|
-| `docker-compose.hl12.yml` | `crud-app` + `additional-app`; `extra_hosts` для **`hl14.zil` / `hl15.zil`**; переменные **`KAFKA_*`** |
+| `docker-compose.hl12.yml` | `crud-app` + `additional-app`; `extra_hosts` для **`hl14.zil` / `hl15.zil`**; переменные **`KAFKA_*`**; опционально **`kafka-proxy`** (профиль `lab13`) |
+| `k6/kafka-proxy/` | LAB13: REST→Kafka прокси для k6 (`/produce/viewer`) |
 | `.env` | БД, образы, лимиты CPU/RAM; при необходимости `HL14_ZIL_IP`, `HL15_ZIL_IP`, `KAFKA_TOPIC` |
 | `scripts/send_kafka_message.py` | отправка JSON-команды в топик (Python, `kafka-python`) |
 | `src/main/java/ru/hse/lab2/kafka/*` | consumer, разбор команд, обработчики (лаб. 12) |
@@ -184,6 +186,52 @@ bash scripts/lab9-hl3.sh prepare
 
 - `extra_hosts`, bootstrap **9094**, имя топика;
 - вывод шага B и шага C (фильм с `$TITLE` в `GET /api/films`).
+
+### Лабораторная 13 — нагрузка через Kafka (batch listener)
+
+**Цель ТЗ:** нагрузочное тестирование стенда LAB12; операции записи из k6 идут в **Kafka** (не в `POST /api/viewers`); listener — **batch**; топик с **2 партициями**; сравнение **`@KafkaListener(concurrency)`** `1` и `2`; лимиты **CPU** для `crud-app` и `additional-app` одинаково — **0.5** и **1.0**.
+
+**Что сделано в репозитории**
+
+1. **`KafkaBatchListenerConfig`** + **`KafkaCommandListener`** принимает `List<ConsumerRecord<…>>` и для каждой записи вызывает прежний `KafkaCommandDispatcher`.
+2. **`spring.kafka.consumer.max-poll-records`** (переменная **`KAFKA_MAX_POLL_RECORDS`**, по умолчанию 200).
+3. **`k6/kafka-proxy/`** — FastAPI + `kafka-python`: `POST /produce/viewer`, тело `{"payload":{"name":"…","email":"…"}}`, ключ сообщения — email (распределение по партициям). Переменные **`KAFKA_BOOTSTRAP_SERVERS`**, **`KAFKA_TOPIC`**.
+4. Запуск прокси:
+   - отдельно (как у одногрупника, только прокси на ВМ с k6): **`k6/kafka-proxy/docker-compose.yml`** —  
+     `docker compose -f k6/kafka-proxy/docker-compose.yml up -d --build` (или `cd k6/kafka-proxy && docker compose up -d --build`);
+   - вместе со стендом LAB12: **`docker-compose.hl12.yml`** + профиль **`lab13`** —  
+     `docker compose -f docker-compose.hl12.yml --profile lab13 up -d --build`
+5. **`k6/cinema-constant.js`** — по умолчанию **`K6_WRITE_MODE=kafka`**: POST на **`BASE_URL_KAFKA_PROXY`** (дефолт `http://127.0.0.1:8082`). Для старого сценария: **`K6_WRITE_MODE=rest`**.
+6. **`k6/run-ratio-sweep.sh`** передаёт **`BASE_URL_KAFKA_PROXY`** и **`K6_WRITE_MODE`**.
+7. **`scripts/verify-lab13.sh`** — смоук: `clean test`, `docker build` для **`k6/kafka-proxy/`**, venv с зависимостями прокси; при установленном **k6** выводит версию.
+
+**Матрица прогонов (пример)**
+
+Для каждой комбинации выставить **`APP_CPU_LIMIT`** и **`ADDITIONAL_CPU_LIMIT`** одинаково (`0.5` или `1.0`), **`KAFKA_LISTENER_CONCURRENCY`** (`1` или `2`), перезапустить compose, поднять прокси, затем:
+
+```bash
+RESULT_CPU=0.5 ./k6/run-ratio-sweep.sh
+```
+
+Файлы summary попадут в `k6/reports/` и при **`RESULT_CPU`** — в `k6/results/cpu-<значение>/` (или в `k6/results-<K6_RESULTS_SUFFIX>/cpu-*` при суффиксе для LAB13). Графики — `k6/plot-from-results.sh` / `k6/plot-png.sh`; полный прогон с опциональным суффиксом — `k6/lab9-hl11-run-all.sh` (см. `k6/env.sh`).
+
+Смок прокси:
+
+```bash
+curl -sS http://127.0.0.1:8082/health
+curl -sS -X POST http://127.0.0.1:8082/produce/viewer \
+  -H 'Content-Type: application/json' \
+  -d '{"payload":{"name":"Proxy","email":"proxy-test@k6.local"}}'
+```
+
+Локальная проверка артефактов (нужны **JDK 25**, **Docker** опционально):
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64   # Linux Debian/Ubuntu c пакетом openjdk-25-jdk-headless
+bash scripts/verify-lab13.sh
+```
+
+Если **`./gradlew`** долго висит на `Downloading ... gradle-9.1.0-bin.zip`, скачайте архив с GitHub (`gradle-distributions`, релиз v9.1.0) в каталог `~/.gradle/wrapper/dists/gradle-9.1.0-bin/9agqghryom9wkf8r80qlhnts3/gradle-9.1.0-bin.zip` и снова запустите wrapper.
 
 ## Быстрый чеклист
 

@@ -1,17 +1,38 @@
 #!/usr/bin/env bash
 # Три прогона с постоянными VU и смесиями POST/GET:
-#   POST /api/viewers (CRUD), GET /api/cinema/films/max-viewers-summary (CRUD), см. k6/cinema-constant.js.
+#   LAB13: POST -> kafka-proxy /produce/viewer (по умолчанию), GET -> CRUD max-viewers-summary.
+#   Легаси: K6_WRITE_MODE=rest — POST /api/viewers.
 #
 # Результаты:
 #   RESULT_CPU=0.5|1.0  ->  k6/reports/summary-<mix>-vus-<N>-cpu-<tag>.json
-#                        и копия в results/cpu-<tag>/ (для plot_k6_cpu_results.py).
-#   без RESULT_CPU       ->  ...-vus-<N>-run-<timestamp>.json (в results/ не копируется).
+#                        и копия в <results-parent>/cpu-<tag>/ (для plot_k6_cpu_results.py).
+#   без RESULT_CPU       ->  ...-vus-<N>-run-<timestamp>.json (в <results-parent>/ не копируется).
+#
+# LAB13 / несколько прогонов: родитель каталогов cpu-* задаётся так (первое подходящее):
+#   K6_RESULTS_BASE=/abs/path   — явный каталог-родитель cpu-0.5 / cpu-1.0
+#   K6_RESULTS_SUFFIX=conc-1   — родитель = k6/results-conc-1 (на hl11 не перезаписывает другой прогон)
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-mkdir -p k6/reports results/cpu-0.5 results/cpu-1.0
+
+# Родитель cpu-0.5 / cpu-1.0 (по умолчанию k6/results)
+if [[ -n "${K6_RESULTS_BASE:-}" ]]; then
+  RESULTS_PARENT="${K6_RESULTS_BASE}"
+else
+  RESULTS_PARENT="${ROOT}/k6/results"
+  if [[ -n "${K6_RESULTS_SUFFIX:-}" ]]; then
+    _rsuf="${K6_RESULTS_SUFFIX#/}"
+    _rsuf="${_rsuf%/}"
+    if [[ -z "${_rsuf}" ]]; then
+      echo "Ошибка: K6_RESULTS_SUFFIX пустой после нормализации" >&2
+      exit 1
+    fi
+    RESULTS_PARENT="${ROOT}/k6/results-${_rsuf}"
+  fi
+fi
+mkdir -p k6/reports "${RESULTS_PARENT}/cpu-0.5" "${RESULTS_PARENT}/cpu-1.0" k6/logs
 
 BASE_MAIN="${BASE_URL_MAIN:-http://localhost:8080}"
 BASE_MAIN="${BASE_MAIN%/}"
@@ -23,7 +44,7 @@ SUMMARY_LIMIT="${SUMMARY_LIMIT:-100}"
 K6_ROUTE="${K6_ROUTE:-server-to-server}"
 K6_THRESHOLDS_OFF="${K6_THRESHOLDS_OFF:-1}"
 
-echo "=== sweep: MAIN=${BASE_MAIN} TARGET_VUS=${TARGET_VUS} SUMMARY_LIMIT=${SUMMARY_LIMIT} ==="
+echo "=== sweep: MAIN=${BASE_MAIN} TARGET_VUS=${TARGET_VUS} SUMMARY_LIMIT=${SUMMARY_LIMIT} RESULTS_PARENT=${RESULTS_PARENT} ==="
 
 normalize_result_cpu() {
   local x="${1// /}"
@@ -59,6 +80,8 @@ run_one() {
   k6 run \
     -e "SUMMARY_FILE=$sum" \
     -e "BASE_URL_MAIN=${BASE_MAIN}" \
+    -e "BASE_URL_KAFKA_PROXY=${BASE_URL_KAFKA_PROXY:-http://127.0.0.1:8082}" \
+    -e "K6_WRITE_MODE=${K6_WRITE_MODE:-kafka}" \
     -e "BASE_URL_ADDITIONAL=${BASE_ADD}" \
     -e "TARGET_VUS=${TARGET_VUS}" \
     -e "POST_SHARE=${share}" \
@@ -78,7 +101,7 @@ run_one 0.95 "post95-get05"
 echo "Готово. JSON в k6/reports/summary-*${FILE_STEM_SUFFIX}.json"
 
 if [[ -n "${RESULT_CPU_LABEL}" ]]; then
-  dest="${ROOT}/results/cpu-${RESULT_CPU_LABEL}"
+  dest="${RESULTS_PARENT}/cpu-${RESULT_CPU_LABEL}"
   mkdir -p "$dest"
   shopt -s nullglob
   copies=( k6/reports/summary-*-vus-${TARGET_VUS}-cpu-${RESULT_CPU_LABEL}.json )
@@ -91,6 +114,17 @@ if [[ -n "${RESULT_CPU_LABEL}" ]]; then
   echo "Скопировано в ${dest}/"
 
   if [[ "${AUTO_PLOT:-0}" == "1" ]]; then
-    TARGET_VUS="${TARGET_VUS}" "${ROOT}/k6/plot-from-results.sh"
+    _plot_out="${K6_PNG_OUT_DIR:-$ROOT/k6/png_k6}"
+    if [[ -n "${K6_PNG_PREFIX+x}" ]]; then
+      _plot_pre="${K6_PNG_PREFIX:-vs-cpu}"
+    elif [[ -n "${K6_RESULTS_SUFFIX:-}" ]]; then
+      _suf="${K6_RESULTS_SUFFIX#/}"
+      _suf="${_suf%/}"
+      _plot_pre="vs-cpu-${_suf//\//-}"
+    else
+      _plot_pre="vs-cpu"
+    fi
+    K6_PNG_PREFIX="$_plot_pre" TARGET_VUS="${TARGET_VUS}" \
+      "${ROOT}/k6/plot-from-results.sh" "$RESULTS_PARENT" "$_plot_out"
   fi
 fi

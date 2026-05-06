@@ -7,7 +7,7 @@ set -euo pipefail
 # Example:
 #   MAIN_BASE_URL=http://10.60.3.33:8080 \
 #   ADDITIONAL_BASE_URL=http://10.60.3.33:8081 \
-#   OUT_DIR=results/cpu-0.5 \
+#   OUT_DIR=k6/results/cpu-0.5 \
 #   STAMP=cpu-0.5-ratio-50-50 \
 #   bash k6/collect-observability-after-k6.sh
 
