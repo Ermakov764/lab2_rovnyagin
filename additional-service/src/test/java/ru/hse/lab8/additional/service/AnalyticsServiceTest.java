@@ -9,6 +9,7 @@ import ru.hse.lab8.additional.client.CinemaCrudClient;
 import ru.hse.lab8.additional.dto.CrudFilm;
 import ru.hse.lab8.additional.dto.CrudTicket;
 import ru.hse.lab8.additional.dto.FilmStats;
+import ru.hse.lab8.additional.observability.ObservabilityService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -22,12 +23,18 @@ class AnalyticsServiceTest {
     @Mock
     private CinemaCrudClient crudClient;
 
+    @Mock
+    private FilmCacheService filmCacheService;
+
+    @Mock
+    private ObservabilityService observabilityService;
+
     @InjectMocks
     private AnalyticsService analyticsService;
 
     @Test
     void maxViewersSummary_usesMapJoin_countsFirstFilmsWithTickets() {
-        when(crudClient.fetchFilms()).thenReturn(List.of(new CrudFilm(1L, "Интерстеллар")));
+        when(filmCacheService.getFilms()).thenReturn(List.of(new CrudFilm(1L, "Интерстеллар")));
         when(crudClient.fetchAllTickets()).thenReturn(List.of(
                 new CrudTicket(1L, 1L, LocalDate.of(2026, 4, 19)),
                 new CrudTicket(1L, 2L, LocalDate.of(2026, 4, 19)),
@@ -49,7 +56,7 @@ class AnalyticsServiceTest {
 
     @Test
     void maxViewersSummary_whenViewersTied_prefersEarlierDay() {
-        when(crudClient.fetchFilms()).thenReturn(List.of(new CrudFilm(1L, "A")));
+        when(filmCacheService.getFilms()).thenReturn(List.of(new CrudFilm(1L, "A")));
         when(crudClient.fetchAllTickets()).thenReturn(List.of(
                 new CrudTicket(1L, 1L, LocalDate.of(2026, 4, 22)),
                 new CrudTicket(1L, 2L, LocalDate.of(2026, 4, 22)),

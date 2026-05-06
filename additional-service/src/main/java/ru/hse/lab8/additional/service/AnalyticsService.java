@@ -31,6 +31,7 @@ public class AnalyticsService {
     private static final Comparator<LocalDate> EARLIER_WINS_ON_TIE = Comparator.reverseOrder();
 
     private final CinemaCrudClient crudClient;
+    private final FilmCacheService filmCacheService;
     private final ObservabilityService observabilityService;
 
     /**
@@ -44,8 +45,8 @@ public class AnalyticsService {
     public List<FilmStats> maxViewersSummary() {
         long started = observabilityService.start();
         try {
-            // 1) Читаем "сырые" данные из основного CRUD.
-            List<CrudFilm> films = crudClient.fetchFilms();
+            // 1) Фильмы читаем через TTL-кеш: это справочник для вывода названий в аналитике.Теперь не сразу подключаемся в CRUD
+            List<CrudFilm> films = filmCacheService.getFilms();
             // Группировка нужна, чтобы быстро получить все билеты конкретного фильма по его id.
             Map<Long, List<CrudTicket>> ticketsByFilmId = crudClient.fetchAllTickets().stream()
                     .filter(t -> t.filmId() != null)
