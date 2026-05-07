@@ -16,6 +16,21 @@
 #  при необходимости удалите секцию build из этого файла или используйте профиль.)
 #
 # LAB13: прокси k6→Kafka — docker compose -f docker-compose.hl12.yml --profile lab13 up -d --build
+#
+# LAB14: additional-app со Springdoc.
+#
+# На hl03 сборка ВНУТРИ Docker часто падает (таймаут скачивания Gradle с services.gradle.org).
+# Используйте один скрипт (Gradle на хосте, Docker только JAR):
+#   ./scripts/docker-build-additional.sh
+#   # с пересборкой слоёв Docker:  ./scripts/docker-build-additional.sh --no-cache
+#
+# Ручной вариант (то же самое):
+#   ./gradlew :additional-service:bootJar
+#   ADDITIONAL_DOCKERFILE=Dockerfile.additional-service.prebuilt docker compose -f docker-compose.hl12.yml --env-file .env build additional-app
+#   docker compose -f docker-compose.hl12.yml --env-file .env up -d additional-app --force-recreate
+#
+# Если Gradle из хоста тоже не качается — с VPN/прокси курса или скачайте дистрибутив вручную в ~/.gradle/wrapper/dists/…
+# build.network: host — для редких случаев, когда in-Docker Gradle всё же доступен.
 
 services:
   crud-app:
@@ -61,6 +76,10 @@ services:
 
   additional-app:
     image: ${DOCKER_IMAGE_ADDITIONAL:-lavrentiyermakov/lab2_additional:latest}
+    build:
+      context: .
+      dockerfile: ${ADDITIONAL_DOCKERFILE:-Dockerfile.additional-service}
+      network: host
     container_name: lab8_additional_app
     restart: unless-stopped
     ports:

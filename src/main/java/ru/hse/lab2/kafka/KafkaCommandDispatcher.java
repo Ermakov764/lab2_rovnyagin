@@ -9,6 +9,13 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Разбор строкового JSON из Kafka и маршрутизация к нужному {@link KafkaCommandHandler}.
+ * <p>
+ * Конструктор собирает карту {@link EntityType} → хендлер из всех бинов {@link KafkaCommandHandler}
+ * (FILM / VIEWER / TICKET). Цикл listener → dispatcher → handler повторяется для каждого сообщения,
+ * в том числе внутри batch-вызова {@link KafkaCommandListener#listen}.
+ */
 @Component
 public class KafkaCommandDispatcher {
 
@@ -21,6 +28,10 @@ public class KafkaCommandDispatcher {
         handlers.forEach(handler -> this.handlers.put(handler.entityType(), handler));
     }
 
+    /**
+     * Распарсить JSON, проверить обязательные поля, делегировать сущностному хендлеру.
+     * Ошибки валидации/JSON — {@link ValidationException}; остальные из хендлеров пробрасываются в listener.
+     */
     public void dispatch(String rawMessage) {
         KafkaCommandMessage command = parse(rawMessage);
         validate(command);

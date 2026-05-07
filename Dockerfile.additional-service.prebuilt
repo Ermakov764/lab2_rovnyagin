@@ -1,0 +1,17 @@
+# Сборка без Gradle внутри Docker (если services.gradle.org из контейнера недоступен).
+# На хосте (hl03), в каталоге репозитория:
+#   ./gradlew :additional-service:bootJar
+#   docker compose -f docker-compose.hl12.yml --env-file .env build additional-app
+# В .env задайте: ADDITIONAL_DOCKERFILE=Dockerfile.additional-service.prebuilt
+# syntax=docker/dockerfile:1
+FROM eclipse-temurin:25-jre-noble
+WORKDIR /app
+
+RUN groupadd --system spring && useradd --system --gid spring spring
+
+COPY additional-service/build/libs/additional-service.jar app.jar
+
+USER spring:spring
+
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar"]

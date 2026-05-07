@@ -6,6 +6,9 @@ import ru.hse.lab2.api.request.TicketRequest;
 import ru.hse.lab2.exception.ValidationException;
 import ru.hse.lab2.service.TicketService;
 
+/**
+ * Команды Kafka с {@link EntityType#TICKET} → {@link TicketService}.
+ */
 @Component
 public class TicketKafkaCommandHandler implements KafkaCommandHandler {
 

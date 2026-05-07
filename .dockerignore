@@ -1,5 +1,6 @@
 .gradle
-build
+# Только корневой build Gradle; additional-service/build нужен для Dockerfile.additional-service.prebuilt
+/build
 .git
 .idea
 *.iml

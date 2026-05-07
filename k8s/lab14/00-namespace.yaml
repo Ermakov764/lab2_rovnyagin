@@ -1,0 +1,5 @@
+# Namespace по варианту (имя БД hl3 в таблице курса). При другом варианте замените hl3 везде в каталоге.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hl3

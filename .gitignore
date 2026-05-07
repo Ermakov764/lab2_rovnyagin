@@ -31,3 +31,6 @@ k6_lab6_results_pull/
 # Скопированные с ВМ results/cpu-* (лаб. 6)
 results/
 docs/hosts-ports.md
+
+# Лаб. 14: локальная копия секрета БД (не коммитить пароль)
+k8s/lab14/03-secret-db.yaml

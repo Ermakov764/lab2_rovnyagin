@@ -8,6 +8,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+/**
+ * Единственная точка входа consumer: читает топик {@code lab.kafka.topic} и отдаёт управление
+ * {@link KafkaCommandDispatcher}.
+ * <p>
+ * <strong>LAB13:</strong> включён <strong>batch</strong>-режим Spring Kafka — метод принимает список
+ * {@link ConsumerRecord}, полученных одним poll (до {@code max-poll-records} записей). Для каждой записи
+ * вызывается {@code dispatcher.dispatch(value)}; семантика обработки одной команды не меняется.
+ * <p>
+ * {@code concurrency} подставляется из конфигурации ({@code lab.kafka.listener-concurrency}) — это число
+ * потоков listener container внутри процесса (для ТЗ: сравнение 1 vs 2 при двух партициях топика).
+ */
 @Component
 public class KafkaCommandListener {
 
@@ -20,7 +31,9 @@ public class KafkaCommandListener {
     }
 
     /**
-     * LAB13: batch listener — одна запись на команду; разбор как раньше на каждое сообщение в пачке.
+     * Обрабатывает одну пачку записей из poll: для каждой — парсинг JSON и dispatch.
+     * Исключения из {@link KafkaCommandDispatcher} / хендлеров логируются, запись пропускается (остальные в пачке
+     * продолжают обрабатываться).
      */
     @KafkaListener(
             id = "lab2KafkaCommandListener",

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab2-additional
+  namespace: hl3
+  labels:
+    app: lab2-additional
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lab2-additional
+  template:
+    metadata:
+      labels:
+        app: lab2-additional
+    spec:
+      # imagePullSecrets:
+      #   - name: dockerhub-credentials
+      containers:
+        - name: app
+          # После добавления SpringDoc пересоберите образ и пушните тег, указанный здесь (старый :lab8-20260503 без UI).
+          image: docker.io/lavrentiyermakov/lab2_additional:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: http
+          envFrom:
+            - configMapRef:
+                name: lab2-additional-config
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 1Gi

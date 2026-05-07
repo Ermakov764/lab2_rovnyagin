@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab2-additional-config
+  namespace: hl3
+data:
+  SERVER_PORT: "8081"
+  # Внутренний вызов основного CRUD (ClusterIP lab2-main:8080).
+  MAIN_CRUD_BASE_URL: "http://lab2-main:8080"
+  JAVA_TOOL_OPTIONS: "-Xms128m -Xmx512m"

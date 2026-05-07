@@ -6,6 +6,11 @@ import ru.hse.lab2.api.request.ViewerRequest;
 import ru.hse.lab2.exception.ValidationException;
 import ru.hse.lab2.service.ViewerService;
 
+/**
+ * Команды Kafka с {@link EntityType#VIEWER} → {@link ViewerService}.
+ * <p>
+ * В LAB13 нагрузка на создание зрителей часто идёт через Kafka (прокси + k6), а не через {@code POST /api/viewers}.
+ */
 @Component
 public class ViewerKafkaCommandHandler implements KafkaCommandHandler {
 

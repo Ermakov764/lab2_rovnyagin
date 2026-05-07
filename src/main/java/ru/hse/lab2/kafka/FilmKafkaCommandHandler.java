@@ -6,6 +6,9 @@ import ru.hse.lab2.api.request.FilmRequest;
 import ru.hse.lab2.exception.ValidationException;
 import ru.hse.lab2.service.FilmService;
 
+/**
+ * Команды Kafka с {@link EntityType#FILM} → вызовы {@link FilmService} (тот же сценарий, что и REST).
+ */
 @Component
 public class FilmKafkaCommandHandler implements KafkaCommandHandler {
 

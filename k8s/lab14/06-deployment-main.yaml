@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab2-main
+  namespace: hl3
+  labels:
+    app: lab2-main
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lab2-main
+  template:
+    metadata:
+      labels:
+        app: lab2-main
+    spec:
+      # Раскомментируйте после kubectl create secret docker-registry ... (см. 04-secret-dockerhub.yaml.example)
+      # imagePullSecrets:
+      #   - name: dockerhub-credentials
+      containers:
+        - name: app
+          image: docker.io/lavrentiyermakov/lab2_rovnyagin:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: lab2-main-config
+          env:
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lab2-db-credentials
+                  key: SPRING_DATASOURCE_PASSWORD
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 1Gi
